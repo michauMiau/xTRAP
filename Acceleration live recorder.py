@@ -1,3 +1,5 @@
+# TEST PROGRAM TO TEST THE IMU, NOT IMPORTATNT
+
 import machine, time, math, os
 from lib.display import Display
 from lib.userinput import UserInput
