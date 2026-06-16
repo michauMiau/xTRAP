@@ -111,9 +111,6 @@ while True:
 
     # --- SLOW ---
     if time.ticks_diff(now, last_stats_time) > 5000: # Lowered the time to 5s
-#         batt_v = read_voltage()  # your function
-#         batt_pct = voltage_to_percent(batt_v)
-
         msg = f"B,{pct},0"
         sock.sendto(msg.encode(), (HOST_IP, PORT))
 
