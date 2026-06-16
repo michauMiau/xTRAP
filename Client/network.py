@@ -22,7 +22,7 @@ def network_loop():
             while True:  # 🔥 drain buffer
                 data, _ = sock.recvfrom(1024)
                 latest = data
-        except:
+        except Exception:
             pass
 
         if latest:
@@ -41,9 +41,10 @@ def network_loop():
                     state.max_g = max(state.max_g, g)
 
                 elif msg[0] == "B":
-                    state.batt_pct = float(msg[1])
+                    if len(msg) > 1:
+                        state.batt_pct = float(msg[1])
 
-            except:
+            except Exception:
                 pass
             
 def send_steering(angle):
