@@ -7,7 +7,6 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 - **RCAR** — ESP32 + BMI270 accelerometer + servo for steering + motor controller
 - **Client** — Pygame desktop app that displays G-meter, orientation, battery levels and sends steering commands via UDP
 
-
 ## Quick Start
 
 ### Prerequisites
@@ -44,16 +43,19 @@ All communication is over raw UDP:
 ## Features
 
 ### Current ✅
+
 - Real-time G-meter visualization on PC client
 - Steering control via keyboard (←/→ arrows)
 - Battery level display on both Cardputer and PC client
 - Orientation widget showing roll/pitch angle
 
 ### In Progress 🚧
+
 - Motor acceleration
 - Brakes implementation (mechanical or regen braking?)
 
 ### Feature Creep 📋
+
 - Live video streaming from a Phone
 - Force feedback steering wheel support (accelerometer-based)
 - Headlight LED on Cardputer
