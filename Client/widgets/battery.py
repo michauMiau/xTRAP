@@ -1,5 +1,4 @@
 import pygame
-
 class BatteryText:
     def __init__(self, x, y, font):
         self.x = x

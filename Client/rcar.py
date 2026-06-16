@@ -5,7 +5,7 @@ import network
 from lib.hydra.config import Config
 from lib.userinput import bmi270
 from lib.battlevel import Battery
-from machine import I2C, ADC, Pin, PWM
+from machine import I2C, Pin, PWM
 # This code is NOT ISO 270001 Compliant
 
 batt = Battery()
@@ -29,7 +29,7 @@ def connect_wifi():
             try:
                 nic.connect(config['wifi_ssid'], config['wifi_pass'])
                 break
-            except:
+            except Exception:
                 time.sleep_ms(500)
 
         while not nic.isconnected():
@@ -45,7 +45,7 @@ def read_accel():
     try:
         ax, ay, az = imu.acceleration
         return ax, ay, az
-    except:
+    except Exception:
         return 0.0, 0.0, 0.0
 
 # CONFIGURING THE SCREEN BACKLIGHT PWM SO IT DOESN'T GO CRAZY
@@ -106,7 +106,7 @@ while True:
             angle = int(parts[1])
             servo.set_angle(angle)
 
-    except:
+    except Exception:
         pass
 
     # --- SLOW ---

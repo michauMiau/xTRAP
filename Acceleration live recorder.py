@@ -1,10 +1,18 @@
 # TEST PROGRAM TO TEST THE IMU, NOT IMPORTATNT
 
-import machine, time, math, os
+import machine
+import time
+import math
+import os
+
 from lib.display import Display
 from lib.userinput import UserInput
 from lib.userinput import bmi270
-# --- INICJALIZACJA EKRANU I KLAWISZY ---
+from machine import I2C
+
+ZERO_Y = 75
+
+# --- INICJALIZACJA EKRANU I KLAWSZY ---
 display = Display()
 userinput = UserInput()
 
@@ -23,13 +31,10 @@ hist_y = [75] * W
 hist_z = [75] * W
 hist_g = [75] * W
 
-ZERO_Y = 75
-from machine import Pin, I2C
-
 # --- INICJALIZACJA CZUJNIKA BMI270 ---
 # UWAGA: Upewnij się, że piny SDA i SCL zgadzają się z Twoim fizycznym podłączeniem!
 # Użyłem pinów z Twojej dokumentacji (2 i 3). W Cardputerze złącze Grove to zazwyczaj SDA=2, SCL=1.
-i2c = I2C(0) 
+i2c = I2C(0)
 imu = bmi270.BMI270(i2c)
 
 def read_bmi270():
@@ -37,7 +42,7 @@ def read_bmi270():
         # Odczyt bezpośrednio z atrybutu .acceleration tak jak w docsach
         ax, ay, az = imu.acceleration
         return ax, ay, az
-    except Exception as e:
+    except Exception:
         # W razie błędu odczytu zwracamy zera, żeby wykres się nie zawiesił
         return 0.0, 0.0, 0.0
 
@@ -73,10 +78,10 @@ try:
     sd = machine.SDCard(slot=1, width=1)
     os.mount(sd, SD_MOUNT)
     sd_ready = True
-except:
+except Exception:
     sd_ready = False
     
-    
+
     
 # --- POPRAWIONA PĘTLA GŁÓWNA ---
 running = True
@@ -98,7 +103,7 @@ while running:
             elif k == 'SPC':
                 # PAUZA / WZNOWIENIE
                 is_paused = not is_paused
-    except:
+    except Exception:
         pass
 
     # 2. Logika i rysowanie (tylko jeśli NIE ma pauzy)
@@ -108,7 +113,8 @@ while running:
         
         # Nagrywanie do pliku (tylko jeśli wciśnięto ENT i nie ma pauzy)
         if is_recording:
-            is_crash = g_total
+            ACCIDENT_THRESHOLD = 3.0
+            is_crash = g_total > ACCIDENT_THRESHOLD
             try:
                 with open(current_log_file, "a") as f:
                     f.write("{},{:.2f},{:.2f},{:.2f},{:.2f},{}\n".format(
@@ -117,16 +123,21 @@ while running:
                     print("{},{:.2f},{:.2f},{:.2f},{:.2f},{}\n".format(
                         time.ticks_ms(), ax, ay, az, g_total, "CRASH" if is_crash else ""
                     ))
-            except: pass
+            except Exception:
+                pass
 
         # Aktualizacja wykresów
         py_x, py_y, py_z = map_value(ax), map_value(ay), map_value(az)
         py_g = map_value(g_total - 1.0)
         
-        hist_x.pop(0); hist_x.append(py_x)
-        hist_y.pop(0); hist_y.append(py_y)
-        hist_z.pop(0); hist_z.append(py_z)
-        hist_g.pop(0); hist_g.append(py_g)
+        hist_x.pop(0)
+        hist_x.append(py_x)
+        hist_y.pop(0)
+        hist_y.append(py_y)
+        hist_z.pop(0)
+        hist_z.append(py_z)
+        hist_g.pop(0)
+        hist_g.append(py_g)
 
         display.fill(0)
         display.hline(0, ZERO_Y, W, DARK)

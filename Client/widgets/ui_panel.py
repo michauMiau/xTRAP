@@ -64,8 +64,7 @@ class TextBox:
 
             elif not self.active and was_active:
                 pygame.key.stop_text_input()
-                ui.cardputer_ip.update()
-                ui.phone_ip.update()
+                # TODO: update IP display when cardputer disconnects
                 
 
         if not self.active:
