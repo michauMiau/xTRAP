@@ -21,7 +21,7 @@ pygame.key.set_repeat(300, 50)
 threading.Thread(target=network_loop, daemon=True).start()
 
 # --- WIDGETS ---
-g_meter = GMeter(100, 100, 60)
+g_meter = GMeter(100, 100, 60) # Hardcoded posistion values my <3
 battery = BatteryText(200, 50, font)
 orientation = Orientation(450, 100, 80)
 ui = UIPanel()
