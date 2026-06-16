@@ -108,7 +108,7 @@ while running:
         
         # Nagrywanie do pliku (tylko jeśli wciśnięto ENT i nie ma pauzy)
         if is_recording:
-            is_crash = g_total > ACCIDENT_THRESHOLD
+            is_crash = g_total
             try:
                 with open(current_log_file, "a") as f:
                     f.write("{},{:.2f},{:.2f},{:.2f},{:.2f},{}\n".format(
