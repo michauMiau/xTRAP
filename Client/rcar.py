@@ -51,8 +51,8 @@ def read_accel():
 # CONFIGURING THE SCREEN BACKLIGHT PWM SO IT DOESN'T GO CRAZY
 BACKLIGHT_PIN = 38  # Skip this whole section if you don't have a cardputer/backlight
 backlight = PWM(Pin(BACKLIGHT_PIN))
-backlight.freq(1000)     # idk what chatgpt was cooking here
-backlight.duty(0)        # SCREEN OFF
+backlight.freq(1000)     # set freq to reasonable amount
+backlight.duty(0)        # Backlight off
 
 # --- SERVO ---
 class Servo:
