@@ -4,7 +4,7 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 
 ## Architecture
 
-- **HOST** — ESP32 + BMI270 accelerometer + servo for steering + motor controller
+- **RCAR** — ESP32 + BMI270 accelerometer + servo for steering + motor controller
 - **Client** — Pygame desktop app that displays G-meter, orientation, battery levels and sends steering commands via UDP
 
 
@@ -17,25 +17,12 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 - ESP32 board flashed with Micropython + Cardputer libraries (bmi270, display, battlevel, etc.)
 - WiFi connection between the Cardputer and PC
 
-### Run Client
-
-```bash
-cd Client
-python main.py
-```
-
 The client connects to the robot's IP on port 5006 for steering commands and listens on port 5005 for sensor data.
 
-### Run Host (standalone visualization)
-
-```bash
-python "Host.py"
-```
-
-### Flash ESP32 Firmware
+### Running on the Cardputeer
 
 - `rCar.py` — main firmware: reads accelerometer, sends UDP telemetry, receives steering commands from PC, controls servo
-- `Acceleration live recorder.py` — standalone Cardputer app for logging accelerometer data to SD card (ENT = start recording, SPC = pause/resume, ESC = reset)
+- `Acceleration live recorder.py` — standalone Cardputer app for testing the accelerometer
 
 ## Hardware
 

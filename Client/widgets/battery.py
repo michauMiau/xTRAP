@@ -16,18 +16,15 @@ class BatteryText:
         )
 
         # --- PHONE (placeholder) ---
-        phone_pct = state.phone_pct if state.phone_pct else 75  # default
-        charging = False  # placeholder
-
-        phone_color = (255,0,0) if phone_pct < 20 else (255,255,255)
-
-        charge_symbol = "⚡" if charging else ""
-
-        phone_text = self.font.render(
-            f"Phone: {phone_pct:.0f}% {charge_symbol}",
-            True, phone_color
-        )
+#        phone_pct = state.phone_pct if state.phone_pct else 75  # default # Removed to prevent feature creep
+#        charging = False  # placeholder
+#        phone_color = (255,0,0) if phone_pct < 20 else (255,255,255)
+#        charge_symbol = "⚡" if charging else ""
+#        phone_text = self.font.render(
+#            f"Phone: {phone_pct:.0f}% {charge_symbol}",
+#            True, phone_color)
+#        
 
         # --- DRAW ---
-        surface.blit(phone_text, (self.x, self.y))
+#        surface.blit(phone_text, (self.x, self.y))
         surface.blit(car_text, (self.x, self.y + 20))

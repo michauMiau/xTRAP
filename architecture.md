@@ -2,7 +2,7 @@
 
 ## Overview
 
-xTRAP (eXtensible Robotic Technic Automation Platform) is a modular, remote-controlled robot built from LEGO Technic. The system uses an ESP32/LeafLabs board mounted on a Cardputer handheld device with Micropython firmware as the robot's brain. A Pygame desktop application serves as the control center, providing real-time sensor visualization and steering input via keyboard or joystick.
+xTRAP (eXtensible Robotic Technic Automation Platform) is a modular, remote-controlled robot built from LEGO Technic. The system uses an ESP32 board mounted on a Cardputer handheld device with Micropython firmware as the robot's brain. A Pygame desktop application serves as the control center, providing real-time sensor visualization and steering input via keyboard or joystick.
 
 ## System Diagram
 
@@ -15,8 +15,6 @@ xTRAP (eXtensible Robotic Technic Automation Platform) is a modular, remote-cont
 │  + Battery   │                        │ Battery         │
 │  + Servo     │                        │ Steering Input  │
 └──────────────┘                        └─────────────────┘
-
-[SD Card Logging — local accelerometer recording via Acceleration live recorder.py]
 ```
 
 ## Components
@@ -104,12 +102,6 @@ Client/
 | Orientation | Shows roll/pitch angle derived from accelerometer data (currently shows zeros — IMU data disabled) |
 | BatteryText | Displays car battery %, low-battery warning in red (<20%) |
 
-### 3. Host — Deleted (Legacy)
-
-Host.py was a standalone Pygame visualization app that received accelerometer data and rendered a G-meter. It has been removed since:
-- The Client now provides the full UI with all widgets
-- IMU telemetry is disabled on the robot, making this obsolete
-
 ## Data Flow
 
 ### Steering (User → Robot)
@@ -148,8 +140,8 @@ The architecture is designed for future growth — here are the planned extensio
 - G-meter and orientation widgets become functional
 
 ### 2. Video Streaming
-- ESP32 webcam module → MJPEG streaming to PC client over UDP/RTSP
-- Client renders video stream as a widget overlay
+- A separate phone streaming video to the computer
+- Client uses another program (like mpv/vlc) to display video
 - Currently planned but not implemented
 
 ### 3. Force Feedback Steering Wheel
@@ -163,14 +155,9 @@ The architecture is designed for future growth — here are the planned extensio
 - `rcar.py` — command parsing can be extended with new message types (`E,<cmd>`, `M2,<motor_data>`)
 - Designed for future sensors (distance sensors, cameras, etc.)
 
-### 5. Open Source
-- Hardware stabilization phase in progress (motor controller issues)
-- Once hardware is reliable, full open-source release planned
 
 ## Known Issues / TODOs
 
-1. **Motor controller not working** — user ordered replacement motor/servo for steering
-2. **ACCIDENT_THRESHOLD undefined** in Acceleration live recorder app — needs a G-force threshold value
-3. **Battery percentage hardcoded** in ESP32 (`pct = batt.read_pct()` but variable unused in main loop)
+1. **Motor controller not working** — i'm planning to fix this
 4. **WiFi IP hardcoded** as `192.168.1.8` — should be configurable or auto-discovered
 5. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller
