@@ -1,19 +1,20 @@
 # xTRAP — eXtensible Robotic Technic Automation Platform
 
-Remote-controlled LEGO robot built from LEGO Technic, powered by Micropython on a Cardputer (ESP32) with real-time sensor feedback and steering control.
+Remote-controlled driving robot built from Technic (but yours doesn't have to be), powered by Micropython on a Cardputer (ESP32) with real-time sensor feedback and steering control.
 
 ## Architecture
 
-- **Robot** — ESP32 + BMI270 accelerometer + servo for steering + motor controller
+- **HOST** — ESP32 + BMI270 accelerometer + servo for steering + motor controller
 - **Client** — Pygame desktop app that displays G-meter, orientation, battery levels and sends steering commands via UDP
-- **Host** — Standalone Pygame visualization of sensor data (debugging)
+
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.10+ with Pygame (`pip install pygame`)
-- ESP32/LeafLabs board flashed with Micropython + Cardputer libraries (bmi270, display, battlevel, etc.)
+- SDL2 Libraries for Pygame
+- ESP32 board flashed with Micropython + Cardputer libraries (bmi270, display, battlevel, etc.)
 - WiFi connection between the Cardputer and PC
 
 ### Run Client
@@ -40,16 +41,14 @@ python "Host.py"
 
 | Component | Purpose |
 |-----------|---------|
-| ESP32 / LeafLabs | Main controller on Cardputer |
+| ESP32 / Micropython | Main controller on Cardputer |
 | BMI270 (I²C) | 6-DoF accelerometer/gyro for orientation + G-force detection |
 | Servo (pin 4) | Steering control — receives angle commands from PC |
-| Motor controller | Drives motor for movement (work in progress) |
-| SD card slot | Logging data to CSV files (`blackbox_*.csv`) |
-| Cardputer display + backlight (pin 38) | Visual feedback and headlight LEDs |
+| Motor controller | Drives motor for movement |
 
 ## Network Protocol
 
-All communication is over UDP:
+All communication is over raw UDP:
 
 - **Client → ESP32**: `S,<angle>` — steering command (0–180 degrees), port 5006
 - **ESP32 → Client**: `M,ax,ay,az` — accelerometer data, port 5005
@@ -60,21 +59,19 @@ All communication is over UDP:
 ### Current ✅
 - Real-time G-meter visualization on PC client
 - Steering control via keyboard (←/→ arrows)
-- Accelerometer data logging to SD card with crash detection
 - Battery level display on both Cardputer and PC client
 - Orientation widget showing roll/pitch angle
 
 ### In Progress 🚧
-- Motor controller integration — motor not yet working, second servo ordered for steering
-- Headlight LEDs on Cardputer display (backlight control via PWM)
+- Motor acceleration
 - Brakes implementation (mechanical or regen braking?)
 
-### Planned 📋
-- Live video streaming from robot → PC client
+### Feature Creep 📋
+- Live video streaming from a Phone
 - Force feedback steering wheel support (accelerometer-based)
-- Open-source release after hardware stabilization
-- Extensible plugin architecture for additional features
-
+- Headlight LED on Cardputer
+- Controlling the video streaming phone
+  
 ## Contributing
 
-Contributions welcome! This project will be open-sourced once the hardware side is fully stable.
+Contributions welcome!
