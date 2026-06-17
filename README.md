@@ -26,7 +26,7 @@ The client connects to the robot's IP on port 5006 for steering commands and lis
 ## Hardware
 
 | Component | Purpose |
-|-----------|---------|
+| --------- | ------- |
 | ESP32 / Micropython | Main controller on Cardputer |
 | BMI270 (I²C) | 6-DoF accelerometer/gyro for orientation + G-force detection |
 | Servo (pin 4) | Steering control — receives angle commands from PC |
