@@ -1,5 +1,4 @@
-# TEST PROGRAM TO TEST THE IMU, NOT IMPORTATNT
-
+""" TEST PROGRAM: Live recorder for acceleration data from IMU sensor."""
 import machine
 import time
 import math
