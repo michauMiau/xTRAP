@@ -16,12 +16,13 @@ font = pygame.font.SysFont(None, 24)
 
 pygame.display.set_caption("RC Control Center")
 pygame.key.set_repeat(300, 50)
+pygame._sdl2.controller.init() # Initialize the controller module for controlling with a pad
 
 # --- START NETWORK THREAD ---
 threading.Thread(target=network_loop, daemon=True).start()
 
 # --- WIDGETS ---
-g_meter = GMeter(100, 100, 60) # Hardcoded posistion values my <3
+g_meter = GMeter(100, 100, 60) # Hardcoded position values my <3
 battery = BatteryText(200, 50, font)
 orientation = Orientation(450, 100, 80)
 ui = UIPanel()

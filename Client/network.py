@@ -51,3 +51,7 @@ def send_steering(angle):
     msg = f"S,{int(angle)}"
     send_sock.sendto(msg.encode(), CAR_ADDR)
     print("sent" + msg)
+
+def send_throttle(throttle): #  TODO: Send the throttle, currently unimplemented on robot side and input
+    msg = f"T,{int(throttle)}"
+    send_sock.sendto(msg.encode(), CAR_ADDR) # Unsure if both send msg will cause race condidtions?

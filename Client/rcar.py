@@ -106,6 +106,10 @@ while True:
             angle = int(parts[1])
             servo.set_angle(angle)
 
+        if parts[0] == "T" and len(parts) > 1: # TO DO: groundwork for throttle
+            throttle = int(parts[1])
+#            servo.set_angle(angle)
+
     except Exception:
         pass
 

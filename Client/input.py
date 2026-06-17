@@ -25,3 +25,12 @@ def handle_input():
     if new_angle != state.steer:
         state.steer = new_angle
         send_steering(new_angle)
+
+
+    # TO DO: ADD THROTTLE CONTROL AND CONTROLLER INPUT
+    # Throttle shall have 2 modes, Regular: aka  when throttle  is let off it instantly goes to 0% an the robot stops
+    # Simulated: The throttle behaves like an engine in this mode, when throttle is let off it gradually goes down till it stops
+    # Pressing reverse will stop the robot and set throttle to 0% (functions like brakes)
+    # Further press of reverse will send the car into reverse, i'm  thinking we can just send T = -100 for the throttle
+    # The minus throttle will have to be handled car side.
+    # This will behave like beamng on controllers then

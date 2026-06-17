@@ -20,7 +20,7 @@ The client connects to the robot's IP on port 5006 for steering commands and lis
 
 ### Running on the Cardputeer
 
-- `rCar.py` — main firmware: reads accelerometer, sends UDP telemetry, receives steering commands from PC, controls servo
+- `rcar.py` — main firmware: reads accelerometer, sends UDP telemetry, receives steering commands from PC, controls servo
 - `Acceleration live recorder.py` — standalone Cardputer app for testing the accelerometer
 
 ## Hardware
