@@ -1,4 +1,9 @@
 """Kivy RC client — works on Android, PC, Steam Deck."""
+import os
+# FIX: set GL backend before any kivy imports — fixes the Cython init crash
+os.environ['KIVY_GL_BACKEND'] = 'egl'
+os.environ['KIVY_NO_ARGS'] = '1'
+
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
@@ -49,9 +54,8 @@ def on_gamepad_axis(gamepad, axis_id, value):
 
 def on_gamepad_button(gamepad, button_id, pressed):
     """Gamepad button event."""
-    # Button mapping — configurable per gamepad
     if not pressed:
-        return  # Only fire on press
+        return
     if button_id == 320:   # A / Cross button = forward (throttle)
         send_cmd("T,100")
     elif button_id == 308:  # X / Square = reverse
@@ -136,19 +140,22 @@ class RCClient(BoxLayout):
         except Exception as e:
             self.status_label.text = f"ERROR: {e}"
 
-# --- MAIN ---
+# --- MAIN (proper Kivy App framework) ---
+class RCKivyApp(App):
+    def build(self):
+        Window.bind(on_key_down=on_key_down)  # Keyboard (PC only, Kivy 2.x)
+        
+        self.rc = RCClient()
+        
+        # Register gamepad — Kivy 2.3+ automatic gamepad handling
+        try:
+            for gp in Window.get_gamepads():
+                on_gamepad_axis(gp, None, None)  # Trigger connection event
+        except Exception:
+            print("No gamepad detected")
+        
+        return self.rc
+
 if __name__ == '__main__':
-    Window.bind(on_key_down=on_key_down)  # Keyboard (PC only, Kivy 2.x)
-
-    app = App()
-    rc = RCClient()
-
-    # Register gamepad — Kivy 2.3+ automatic gamepad handling
-    try:
-        from kivy.core.window import Window as Win
-        for gp in Win.get_gamepads():
-            on_gamepad_axis(gp, None, None)  # Trigger connection event
-    except Exception:
-        print("No gamepad detected")
-
+    app = RCKivyApp()
     app.run()
