@@ -1,14 +1,9 @@
 """Kivy RC client test — minimal cross-platform (Android/PC/Steam Deck)"""
 
 import os
-# Force Kivy to use SDL2 + standard GL (not EGL which fails on Wayland-only systems)
-os.environ["SDL_VIDEODRIVER"] = "wayland"
-os.environ["KIVY_GL_BACKEND"] = "gl"  # Use standard GL, not EGL
-os.environ["KIVY_WINDOW"] = "sdl2"   # Force SDL2 window backend (not x11)
-
-# Disable clipboard providers that fail without xclip/xsel
-os.environ["KIVY_NO_ARGS"] = "1"
-os.environ["KIVY_LOG_LEVEL"] = "info"
+# Must set BEFORE any Kivy imports!
+os.environ["KIVY_GL_BACKEND"] = "gles2"  # OpenGL ES 2.0 - works on Wayland & Android
+os.environ["SDL_VIDEODRIVER"] = "wayland"  # Use Wayland video driver instead of x11
 
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
