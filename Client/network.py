@@ -5,14 +5,14 @@ import math
 from state import state
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-CAR_ADDR = ("192.168.1.174", 5006)
+CAR_ADDR = ("192.168.1.174", 5006)  # Default — can be changed via UI connect logic
 
-PORT = 5005
+PORT_RECV = 5005  # Port for receiving sensor data from Cardputer
 
             
 def network_loop():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", PORT))
+    sock.bind(("0.0.0.0", PORT_RECV))
     sock.setblocking(False)
 
     latest = None
