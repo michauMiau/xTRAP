@@ -11,9 +11,9 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 
 ### Prerequisites
 
-- Python 3.10+ with Pygame (`pip install pygame`)
-- SDL2 Libraries for Pygame
-- ESP32 board flashed with Micropython + Cardputer libraries (bmi270, display, battlevel, etc.)
+- Python 3.10+ with Pygame (`pip install kivy`)
+- GL libraries for Kivy
+- ESP32 board flashed with MicroHydra 
 - WiFi connection between the Cardputer and PC
 
 The client connects to the robot's IP on port 5006 for steering commands and listens on port 5005 for sensor data.
