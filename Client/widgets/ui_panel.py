@@ -116,7 +116,7 @@ class PanelUI(BoxLayout):
         result = self._validate_ip(ip)
         
         if not result:
-           # Show error — flash red briefly
+            # Show error — flash red briefly
             self.status_label.text = "INVALID IP"
             self.status_label.color = (1, 0.3, 0.3)
             KClock.schedule_once(lambda dt: setattr(self.status_label, 'text', ''), 2)

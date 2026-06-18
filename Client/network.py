@@ -40,7 +40,7 @@ def disconnect():
     
     # Close send socket
     try:
-        if send_sock and not send_sock.closed:
+        if send_sock:
             send_sock.close()
     except Exception as e:
         log.error(f"Error closing send socket: {e}")
@@ -105,7 +105,7 @@ def _stop_network_loop():
     
     # Close send socket when stopping
     try:
-        if send_sock and not send_sock.closed:
+        if send_sock:
             send_sock.close()
     except Exception as e:
         log.error(f"Error closing send socket on stop: {e}")

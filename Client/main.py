@@ -83,7 +83,7 @@ class StatusPanel(FloatLayout):
         super().__init__()
         
         # Battery display
-        self.battery = Battery()  # Use the Battery widget
+        self.battery = Battery()  # Use the Kivy Battery widget
         
         # G-meter text (from original main.py — keeps the G calculation logic from state)
         self.g_label = Label(
