@@ -11,4 +11,8 @@ class State:
         self.batt_v = 0
         self.batt_pct = 0
         self.phone_pct = 0
+        
+        # Steering and throttle (added for Kivy port)
+        self.steer = 180  # Default: straight ahead
+        self.throttle = 0  # Default: neutral/not moving
 state = State()
