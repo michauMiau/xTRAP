@@ -13,10 +13,15 @@ In Kivy:
 Since we only need IP address management (no camera controls), this is simplified.
 """
 
+import logging
+from kivy.clock import Clock as KClock
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.slider import Slider as KSlider
 from kivy.uix.textinput import TextInput as KTextInput
+from kivy.uix.label import Label as KLabel
+
+log = logging.getLogger(__name__)
 
 
 class PanelUI(BoxLayout):
@@ -37,16 +42,13 @@ class PanelUI(BoxLayout):
         self.size_hint_y = None
         self.height = 60
         
-        # Labels for titles (same as pygame version positioning)
-        car_ip_label = KButton(
-            text="Car IP", font_size=14, size_hint_x=None, width=80,
-            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1),
-            # Using Button as label placeholder (no event binding)
+        # Labels for titles (replaced Button with Label — no event binding needed)
+        car_ip_label = KLabel(
+            text="Car IP", font_size=14, size_hint_x=None, width=80
         )
         
-        phone_ip_label = KButton(
-            text="Phone IP", font_size=14, size_hint_x=None, width=80,
-            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1),
+        phone_ip_label = KLabel(
+            text="Phone IP", font_size=14, size_hint_x=None, width=80
         )
         
         # Car IP input (TextInput — Kivy handles focus/IME natively)
@@ -61,6 +63,11 @@ class PanelUI(BoxLayout):
             font_size=14, background_color=(0.3, 0.3, 0.3), color=(1, 1, 1)
         )
         
+        # Status label for connection feedback
+        self.status_label = KLabel(
+            text="", font_size=12, size_hint_x=None, width=80
+        )
+        
         # Connect button (replaces pygame's TextBox ENTER key handling)
         self.connect_btn = KButton(
             text="CONNECT", font_size=14, size_hint_x=None, width=80,
@@ -71,20 +78,63 @@ class PanelUI(BoxLayout):
         self.add_widget(self.car_ip_input)
         self.connect_btn.bind(on_press=self._connect)
         self.add_widget(self.connect_btn)
+        self.add_widget(self.status_label)
         
         self.add_widget(phone_ip_label)
         self.add_widget(self.phone_ip_input)
     
+    def _validate_ip(self, ip_str):
+        """Validate IP:port format. Returns (ip, port) tuple or None if invalid."""
+        try:
+            parts = ip_str.rsplit(":", 1)
+            ip_addr = parts[0]
+            
+            # Basic IP validation (4 octets, each 0-255)
+            if not all(0 <= int(p) <= 255 for p in ip_addr.split(".")):
+                return None
+            
+            port = 5006 if len(parts) == 1 else int(parts[1])
+            
+            # Validate port range (1-65535)
+            if not (1 <= port <= 65535):
+                return None
+                
+            return ip_addr, port
+        except ValueError:
+            return None
+    
     def _connect(self, *args):
         """Handle connect/disconnect button press"""
+        import network
+        
         ip = self.car_ip_input.text.strip()
         if not ip:
-            print("Enter IP first!")
+            self.status_label.text = "ERROR"
+            self.status_label.color = (1, 0.3, 0.3)
             return
         
-        # TODO: Implement actual connection logic here
-        # For now just print the IP for testing
-        print(f"Connecting to {ip}...")
+        result = self._validate_ip(ip)
+        
+        if not result:
+           # Show error — flash red briefly
+            self.status_label.text = "INVALID IP"
+            self.status_label.color = (1, 0.3, 0.3)
+            KClock.schedule_once(lambda dt: setattr(self.status_label, 'text', ''), 2)
+            return
+        
+        ip_addr, port = result
+        network.CAR_ADDR = (ip_addr, port)
+        
+        try:
+            # Try to connect — sends a PING to verify connection
+            network.send_sock.sendto(b"PING", (ip_addr, port))
+            
+            self.status_label.text = "CONNECTED"
+            self.status_label.color = (0.3, 1, 0.3)
+        except Exception as e:
+            log.error(f"Failed to connect to {ip_addr}:{port}: {e}")
+            self.status_label.text = "FAILED"
+            self.status_label.color = (1, 0.3, 0.3)
 
 
 class ZoomSlider(BoxLayout):
@@ -105,9 +155,8 @@ class ZoomSlider(BoxLayout):
         self.size_hint_y = None
         self.height = 30
         
-        label = KButton(
-            text="Zoom", font_size=14, size_hint_x=None, width=50,
-            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1)
+        label = KLabel(
+            text="Zoom", font_size=14, size_hint_x=None, width=50
         )
         
         self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=150)
@@ -126,9 +175,8 @@ class QualitySlider(BoxLayout):
         self.size_hint_y = None
         self.height = 30
         
-        label = KButton(
-            text="Quality", font_size=14, size_hint_x=None, width=60,
-            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1)
+        label = KLabel(
+            text="Quality", font_size=14, size_hint_x=None, width=60
         )
         
         self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=150)

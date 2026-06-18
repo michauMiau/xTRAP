@@ -1,8 +1,13 @@
 """Main entry point for the RC Control Center — cross-platform (Android/PC/Steam Deck)"""
 
 import os
-# Force GL backend for Kivy on Wayland-only systems
-os.environ["KIVY_GL_BACKEND"] = "gl"
+import sys
+# Detect optimal Kivy GL backend (respect user override if set)
+if not os.environ.get("KIVY_GL_BACKEND"):
+    # Wayland-only systems need desktop OpenGL, not EGL
+    has_x11 = bool(os.environ.get("DISPLAY") or "x11" in sys.platform)
+    if not has_x11:
+        os.environ["KIVY_GL_BACKEND"] = "gl"
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -13,12 +18,16 @@ from kivy.uix.label import Label
 
 import threading
 from state import state
-from network import network_loop, send_steering, send_throttle
+from network import (
+    _start_network_loop, 
+    connect, 
+    disconnect, 
+    is_connected,
+    send_steering,
+    send_throttle,
+)
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
-
-# --- START NETWORK THREAD ---
-threading.Thread(target=network_loop, daemon=True).start()
 
 
 class SteeringPanel(FloatLayout):
@@ -96,6 +105,14 @@ class RCControlCenterApp(App):
         
         # Setup window for mobile/PC use — same size as pygame version (800x200)
         Window.size = (800, 200)
+
+    def on_start(self):
+        """Start the network receive loop when app starts."""
+        _start_network_loop()
+
+    def on_stop(self):
+        """Cleanup — stop network thread and close sockets on exit."""
+        disconnect()
     
     def build(self):
         root = FloatLayout()
@@ -121,17 +138,37 @@ class RCControlCenterApp(App):
         root.add_widget(self.ui_panel)
         
         # Bind buttons to send commands via network functions directly
-        self.steering_panel.left_btn.bind(on_press=lambda *a: state.__setattr__('steer', 0) and send_steering(0))
-        self.steering_panel.right_btn.bind(on_press=lambda *a: state.__setattr__('steer', 180) and send_steering(180))
+        self.steering_panel.left_btn.bind(on_press=self._on_steer_left)
+        self.steering_panel.right_btn.bind(on_press=self._on_steer_right)
         
-        self.throttle_panel.reverse_btn.bind(on_press=lambda *a: state.__setattr__('throttle', -100) and send_throttle(-100))
-        self.throttle_panel.forward_btn.bind(on_press=lambda *a: state.__setattr__('throttle', 100) and send_throttle(100))
+        self.throttle_panel.reverse_btn.bind(on_press=self._on_throttle_reverse)
+        self.throttle_panel.forward_btn.bind(on_press=self._on_throttle_forward)
         
         # Schedule UI update loop (replaces pygame clock.tick)
         Clock.schedule_interval(self.update_ui, 1/60)  # 60 FPS like original
         
         return root
     
+    def _on_steer_left(self, *a):
+        """Handle steering left — set state and send command via network"""
+        state.steer = 0
+        send_steering(0)
+    
+    def _on_steer_right(self, *a):
+        """Handle steering right — set state and send command via network"""
+        state.steer = 180
+        send_steering(180)
+    
+    def _on_throttle_reverse(self, *a):
+        """Handle throttle reverse — set state and send command via network"""
+        state.throttle = -100
+        send_throttle(-100)
+    
+    def _on_throttle_forward(self, *a):
+        """Handle throttle forward — set state and send command via network"""
+        state.throttle = 100
+        send_throttle(100)
+
     def update_ui(self, dt):
         """Update UI elements with current state — called every frame by Clock.schedule_interval"""
         # Update steering display
