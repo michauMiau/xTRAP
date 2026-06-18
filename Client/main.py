@@ -1,30 +1,35 @@
-# Here be dragons
-import pygame
+"""Main client loop"""
+import kivy
 import threading
 from state import state
 from network import network_loop
-from widgets.g_meter import GMeter
-from widgets.battery import BatteryText
-from widgets.orientation import Orientation
-from widgets.ui_panel import UIPanel
+#from widgets.g_meter import GMeter # TODO: Implement for kivy later
+from widgets.battery import BatteryText # TODO: Refactor for kivy
+#from widgets.orientation import Orientation  #  TODO: Implement for kivy later
+from widgets.ui_panel import UIPanel # TODO: Refactor for kivy
 from input import handle_input
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.textinput import TextInput
+from kivy.core.window import Window
+from kivy.utils import get_color_from_hex as color
 
-pygame.init()
-screen = pygame.display.set_mode((800, 200))
-clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 24)
+#screen = pygame.display.set_mode((800, 200))
+#clock = pygame.time.Clock()
+#font = pygame.font.SysFont(None, 24)
 
-pygame.display.set_caption("RC Control Center")
-pygame.key.set_repeat(300, 50)
-pygame._sdl2.controller.init() # Initialize the controller module for controlling with a pad
+#pygame.display.set_caption("RC Control Center")
+
+#pygame._sdl2.controller.init() # Initialize the controller module for controlling with a pad
 
 # --- START NETWORK THREAD ---
 threading.Thread(target=network_loop, daemon=True).start()
 
 # --- WIDGETS ---
-g_meter = GMeter(100, 100, 60) # Hardcoded position values my <3
+#g_meter = GMeter(100, 100, 60) # Hardcoded position values my <3
 battery = BatteryText(200, 50, font)
-orientation = Orientation(450, 100, 80)
+#orientation = Orientation(450, 100, 80)
 ui = UIPanel()
 
 running = True

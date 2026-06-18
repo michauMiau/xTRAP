@@ -1,4 +1,4 @@
-import pygame
+"""Battery percent ui text"""
 class BatteryText:
     def __init__(self, x, y, font):
         self.x = x

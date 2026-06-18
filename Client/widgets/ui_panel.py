@@ -1,5 +1,4 @@
-import pygame
-
+"""UI Panel, contains some buttons"""
 class Button:
     def __init__(self, rect, text):
         self.rect = pygame.Rect(rect)
