@@ -1,151 +1,137 @@
-"""UI Panel, contains some buttons"""
-class Button:
-    def __init__(self, rect, text):
-        self.rect = pygame.Rect(rect)
-        self.text = text
-        self.active = False
+"""UI Panel for Kivy — IP management widget (replaces pygame custom widgets)
 
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(event.pos):
-                self.active = not self.active
-                return True
-        return False
+Original (pygame) had:
+1. Button class → Custom rect drawing + mouse event handling
+2. Slider class → Custom rectangle + circle knob dragging  
+3. TextBox class → Custom text input with cursor animation
+   
+In Kivy:
+- Use kivy.uix.button.Button for buttons
+- Use kivy.uix.slider.Slider for sliders
+- Use kivy.uix.textinput.TextInput for text input
 
-    def draw(self, surface, font):
-        color = (0,200,0) if self.active else (80,80,80)
-        pygame.draw.rect(surface, color, self.rect)
-        txt = font.render(self.text, True, (255,255,255))
-        surface.blit(txt, (self.rect.x+5, self.rect.y+5))
+Since we only need IP address management (no camera controls), this is simplified.
+"""
 
-class Slider:
-    def __init__(self, x, y, w, min_val=0, max_val=1):
-        self.rect = pygame.Rect(x, y, w, 10)
-        self.value = 0
-        self.dragging = False
-        self.min = min_val
-        self.max = max_val
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button as KButton
+from kivy.uix.slider import Slider as KSlider
+from kivy.uix.textinput import TextInput as KTextInput
 
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(event.pos):
-                self.dragging = True
 
-        elif event.type == pygame.MOUSEBUTTONUP:
-            self.dragging = False
-
-        elif event.type == pygame.MOUSEMOTION and self.dragging:
-            rel = (event.pos[0] - self.rect.x) / self.rect.w
-            self.value = max(0, min(1, rel))
-
-    def draw(self, surface):
-        pygame.draw.rect(surface, (100,100,100), self.rect)
-        knob_x = self.rect.x + int(self.value * self.rect.w)
-        pygame.draw.circle(surface, (255,255,255), (knob_x, self.rect.y+5), 6)
+class PanelUI(BoxLayout):
+    """Simplified UIPanel for IP management (replaces pygame's UIPanel)
+    
+    Original pygame UIPanel had:
+    - 4 buttons (Flash, Front, Back, Focus) — camera controls, not needed
+    - 2 sliders (Zoom, Quality) — camera controls, not needed  
+    - 2 text inputs (Car IP, Phone IP) — only Car IP is relevant
+    
+    Kivy version keeps only the essential: Car IP input + connect button.
+    """
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         
-class TextBox:
-    def __init__(self, x, y, w, default=""):
-        self.rect = pygame.Rect(x, y, w, 25)
-        self.text = default
-        self.active = False
-        self.cursor_timer = 0
-        self.cursor_visible = True
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            was_active = self.active
-            self.active = self.rect.collidepoint(event.pos)
-
-            # 🔥 ONLY enable text input when focused
-            if self.active and not was_active:
-                pygame.key.start_text_input()
-                pygame.key.set_text_input_rect(self.rect)
-
-            elif not self.active and was_active:
-                pygame.key.stop_text_input()
-                # TODO: update IP display when cardputer disconnects
-                
-
-        if not self.active:
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = 60
+        
+        # Labels for titles (same as pygame version positioning)
+        car_ip_label = KButton(
+            text="Car IP", font_size=14, size_hint_x=None, width=80,
+            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1),
+            # Using Button as label placeholder (no event binding)
+        )
+        
+        phone_ip_label = KButton(
+            text="Phone IP", font_size=14, size_hint_x=None, width=80,
+            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1),
+        )
+        
+        # Car IP input (TextInput — Kivy handles focus/IME natively)
+        self.car_ip_input = KTextInput(
+            text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
+            font_size=14, background_color=(0.3, 0.3, 0.3), color=(1, 1, 1)
+        )
+        
+        # Phone IP input (placeholder — not needed for RC control)
+        self.phone_ip_input = KTextInput(
+            text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
+            font_size=14, background_color=(0.3, 0.3, 0.3), color=(1, 1, 1)
+        )
+        
+        # Connect button (replaces pygame's TextBox ENTER key handling)
+        self.connect_btn = KButton(
+            text="CONNECT", font_size=14, size_hint_x=None, width=80,
+            background_color=(0.29, 0.76, 0.31), color=(1, 1, 1)
+        )
+        
+        self.add_widget(car_ip_label)
+        self.add_widget(self.car_ip_input)
+        self.connect_btn.bind(on_press=self._connect)
+        self.add_widget(self.connect_btn)
+        
+        self.add_widget(phone_ip_label)
+        self.add_widget(self.phone_ip_input)
+    
+    def _connect(self, *args):
+        """Handle connect/disconnect button press"""
+        ip = self.car_ip_input.text.strip()
+        if not ip:
+            print("Enter IP first!")
             return
+        
+        # TODO: Implement actual connection logic here
+        # For now just print the IP for testing
+        print(f"Connecting to {ip}...")
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
 
-            elif event.key == pygame.K_RETURN:
-                self.active = False
-                pygame.key.stop_text_input()
+class ZoomSlider(BoxLayout):
+    """Zoom slider — Kivy Slider (replaces pygame custom Slider class)
+    
+    Original pygame version had a manual implementation with:
+    - Custom rect drawing
+    - Circle knob rendering
+    - Mouse drag event handling
+    
+    Kivy version uses built-in Slider widget.
+    """
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = 30
+        
+        label = KButton(
+            text="Zoom", font_size=14, size_hint_x=None, width=50,
+            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1)
+        )
+        
+        self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=150)
+        
+        self.add_widget(label)
+        self.add_widget(self.slider)
 
-        elif event.type == pygame.TEXTINPUT:
-            if event.text and event.text[0] in "0123456789.":
-                self.text += event.text[0]
-                
-    def update(self):
-        self.cursor_timer += 1
-        if self.cursor_timer > 30:
-            self.cursor_timer = 0
-            self.cursor_visible = not self.cursor_visible
 
-    def draw(self, surface, font):
-        color = (255,255,255) if self.active else (150,150,150)
-        pygame.draw.rect(surface, color, self.rect, 2)
-
-        txt = font.render(self.text, True, (255,255,255))
-        surface.blit(txt, (self.rect.x+5, self.rect.y+5))
-
-        # blinking cursor
-        if self.active and self.cursor_visible:
-            cx = self.rect.x + 5 + txt.get_width()
-            cy = self.rect.y + 5
-            pygame.draw.line(surface, (255,255,255), (cx, cy), (cx, cy+18))
-            
-DEFAULT_IP_PREFIX = "192.168.1.174"
-
-class UIPanel:
-    def __init__(self):
-        self.font = pygame.font.SysFont(None, 20)
-
-        # --- BUTTON GRID ---
-        self.buttons = []
-        labels = ["Flash", "Front", "Back", "Focus"]
-
-        for i, label in enumerate(labels):
-            x = 20 + (i % 4) * 80
-            y = 20 + (i // 4) * 40
-            self.buttons.append(Button((x, y, 70, 30), label))
-
-        # --- SLIDERS ---
-        self.zoom_slider = Slider(400, 20, 150)
-        self.quality_slider = Slider(400, 60, 150)
-
-        # --- TEXT INPUTS ---
-        self.cardputer_ip = TextBox(600, 20, 150, DEFAULT_IP_PREFIX)
-        self.phone_ip = TextBox(600, 60, 150, DEFAULT_IP_PREFIX)
-
-    def handle_event(self, event):
-        for b in self.buttons:
-            b.handle_event(event)
-
-        self.zoom_slider.handle_event(event)
-        self.quality_slider.handle_event(event)
-
-        self.cardputer_ip.handle_event(event)
-        self.phone_ip.handle_event(event)
-
-    def draw(self, surface):
-        for b in self.buttons:
-            b.draw(surface, self.font)
-
-        self.zoom_slider.draw(surface)
-        self.quality_slider.draw(surface)
-
-        self.cardputer_ip.draw(surface, self.font)
-        self.phone_ip.draw(surface, self.font)
-
-        # labels
-        surface.blit(self.font.render("Zoom", True, (255,255,255)), (360, 15))
-        surface.blit(self.font.render("Quality", True, (255,255,255)), (340, 55))
-
-        surface.blit(self.font.render("Car IP", True, (255,255,255)), (600, 0))
-        surface.blit(self.font.render("Phone IP", True, (255,255,255)), (600, 40))
+class QualitySlider(BoxLayout):
+    """Quality slider — Kivy Slider (replaces pygame custom Slider class)"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = 30
+        
+        label = KButton(
+            text="Quality", font_size=14, size_hint_x=None, width=60,
+            background_color=(0.2, 0.2, 0.2), color=(1, 1, 1)
+        )
+        
+        self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=150)
+        
+        self.add_widget(label)
+        self.add_widget(self.slider)

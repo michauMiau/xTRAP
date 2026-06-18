@@ -1,30 +1,38 @@
-"""Battery percent ui text"""
-class BatteryText:
-    def __init__(self, x, y, font):
-        self.x = x
-        self.y = y
-        self.font = font
+"""Battery display widget for Kivy — shows car battery percentage"""
 
-    def draw(self, surface, state):
-        # --- CARDPUTER ---
-        car_pct = state.batt_pct
-        car_color = (255,0,0) if car_pct < 20 else (255,255,255)
+from kivy.uix.label import Label
 
-        car_text = self.font.render(
-            f"Car: {car_pct:.0f}%",
-            True, car_color
-        )
 
-        # --- PHONE (placeholder) ---
-#        phone_pct = state.phone_pct if state.phone_pct else 75  # default # Removed to prevent feature creep
-#        charging = False  # placeholder
-#        phone_color = (255,0,0) if phone_pct < 20 else (255,255,255)
-#        charge_symbol = "⚡" if charging else ""
-#        phone_text = self.font.render(
-#            f"Phone: {phone_pct:.0f}% {charge_symbol}",
-#            True, phone_color)
-#        
-
-        # --- DRAW ---
-#        surface.blit(phone_text, (self.x, self.y))
-        surface.blit(car_text, (self.x, self.y + 20))
+class Battery(Label):
+    """Kivy battery widget — shows car battery percentage
+    
+    Args:
+        state: The shared State object (from state.py) containing batt_pct
+    """
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.state = None  # Will be set from main_kivy.py
+        
+        # Default display
+        self.text = "Car: 0%"
+        self.font_size = 18
+        self.size_hint_x = 1.0
+        self.size_hint_y = None
+        self.height = 25
+        self.background_color = (0.2, 0.2, 0.2)
+        self.color = (1, 1, 1)  # White by default
+        
+    def update(self):
+        """Update display based on current battery state"""
+        if self.state:
+            car_pct = self.state.batt_pct
+            
+            # Color changes below 20% (same as pygame version)
+            if car_pct < 20:
+                self.color = (1, 0, 0)  # Red
+            else:
+                self.color = (1, 1, 1)  # White
+            
+            self.text = f"Car: {car_pct:.0f}%"
