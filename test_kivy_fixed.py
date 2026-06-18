@@ -2,7 +2,6 @@
 
 import os
 # Must set BEFORE any Kivy imports!
-os.environ["KIVY_GL_BACKEND"] = "gles2"  # OpenGL ES 2.0 - works on Wayland & Android
 os.environ["SDL_VIDEODRIVER"] = "wayland"  # Use Wayland video driver instead of x11
 
 from kivy.app import App
