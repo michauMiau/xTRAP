@@ -13,15 +13,12 @@ In Kivy:
 Since we only need IP address management (no camera controls), this is simplified.
 """
 
-import logging
 from kivy.clock import Clock as KClock
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.slider import Slider as KSlider
 from kivy.uix.textinput import TextInput as KTextInput
 from kivy.uix.label import Label as KLabel
-
-log = logging.getLogger(__name__)
 
 
 class PanelUI(BoxLayout):
@@ -54,13 +51,13 @@ class PanelUI(BoxLayout):
         # Car IP input (TextInput — Kivy handles focus/IME natively)
         self.car_ip_input = KTextInput(
             text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
-            font_size=14, background_color=(0.3, 0.3, 0.3), color=(1, 1, 1)
+            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1)
         )
         
         # Phone IP input (placeholder — not needed for RC control)
         self.phone_ip_input = KTextInput(
             text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
-            font_size=14, background_color=(0.3, 0.3, 0.3), color=(1, 1, 1)
+            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1)
         )
         
         # Status label for connection feedback
@@ -132,7 +129,6 @@ class PanelUI(BoxLayout):
             self.status_label.text = "CONNECTED"
             self.status_label.color = (0.3, 1, 0.3)
         except Exception as e:
-            log.error(f"Failed to connect to {ip_addr}:{port}: {e}")
             self.status_label.text = "FAILED"
             self.status_label.color = (1, 0.3, 0.3)
 
