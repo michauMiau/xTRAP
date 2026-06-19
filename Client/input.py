@@ -6,7 +6,6 @@ In Kivy, input comes from:
 1. Kivy widget bindings (buttons in UI panels) — handled by main.py button.on_press callbacks
 2. Keyboard/gamepad events — handled here via Kivy's event system or SDL2 gamepad API
 
-This module provides the high-level functions that buttons call to send commands.
 """
 
 import logging
