@@ -54,20 +54,28 @@ class StatusPanel(BoxLayout):
         self.add_widget(self.g_label)
 
 
-class SteeringPanel(GridLayout):
+class SteeringPanel(BoxLayout):
     """Kivy version of the steering input — uses buttons"""
     
     def __init__(self):
         super().__init__()
         
-        # 3 columns: left button, display, right button
-        self.cols = 3
+        # Horizontal layout: [left_btn] [steer_display] [right_btn]
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = 60
         
-        # Left/Right buttons for steering (touch/PC)
-        self.left_btn = KButton(text="←", font_size=48, size_hint=(0.5, 1))
-        self.right_btn = KButton(text="→", font_size=48, size_hint=(0.5, 1))
+        # Left/Right buttons for steering (touch/PC) - ASCII arrows < >
+        self.left_btn = KButton(
+            text="<", font_size=48, size_hint_x=None, width=60,
+            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
+        )
+        self.right_btn = KButton(
+            text=">", font_size=48, size_hint_x=None, width=60,
+            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
+        )
         
-        # Steering display
+        # Steering display - centered between buttons
         self.steer_display = Label(
             text=f"Steering: {state.steer}°", 
             font_size=24, 
@@ -79,17 +87,22 @@ class SteeringPanel(GridLayout):
         self.add_widget(self.right_btn)
 
 
-class ThrottlePanel(GridLayout):
+class ThrottlePanel(BoxLayout):
     """Kivy version of the throttle input — uses buttons"""
     
     def __init__(self):
         super().__init__()
         
-        # 3 columns: reverse, display, forward
-        self.cols = 3
+        # Horizontal layout: [reverse_btn] [throttle_display] [forward_btn]
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = 60
         
-        # Reverse/Brake button (left)
-        self.reverse_btn = KButton(text="←", font_size=48, size_hint=(0.5, 1))
+        # Reverse/Brake button (left) - ASCII arrow <
+        self.reverse_btn = KButton(
+            text="<", font_size=48, size_hint_x=None, width=60,
+            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
+        )
         
         # Throttle display  
         self.throttle_display = Label(
@@ -98,8 +111,11 @@ class ThrottlePanel(GridLayout):
             size_hint_x=None, width=100
         )
         
-        # Forward/Throttle button (right)
-        self.forward_btn = KButton(text="→", font_size=48, size_hint=(0.5, 1))
+        # Forward/Throttle button (right) - ASCII arrow >
+        self.forward_btn = KButton(
+            text=">", font_size=48, size_hint_x=None, width=60,
+            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
+        )
         
         self.add_widget(self.reverse_btn)
         self.add_widget(self.throttle_display)
@@ -112,10 +128,10 @@ class MainLayout(GridLayout):
     def __init__(self):
         super().__init__()
         
-        # 2 rows: status bar (top), controls (middle), UI panel (bottom)
+        # 3 rows: status bar (top), controls (middle), UI panel (bottom)
         self.rows = 3
         
-        # Status bar at top (battery + G reading)
+        # Status bar at top (battery + G reading) — horizontal layout on top of everything
         self.status_panel = StatusPanel()
         self.add_widget(self.status_panel)
         
@@ -145,17 +161,27 @@ class RCControlCenterApp(App):
         # Setup window for mobile/PC use — same size as pygame version (800x200)
         Window.size = (800, 200)
 
+    def build(self):
+        """Build the main layout — called by Kivy during initialization."""
+        return MainLayout()
+
     def on_start(self):
-        """Start the network receive loop when app starts."""
+        """Start the network receive loop when app starts.
+        
+        self.root is already set by Kivy at this point, so we can safely access it.
+        """
+        # Set up button bindings — self.root is now available via Kivy's init
+        setup_button_bindings(self.root.steering_panel, self.root.throttle_panel)
+        
+        # Start UI update loop (called every frame by Clock.schedule_interval)
+        Clock.schedule_interval(self.update_ui, 1/30)  # ~30fps
+        
         _start_network_loop()
 
     def on_stop(self):
         """Cleanup — stop network thread and close sockets on exit."""
         disconnect()
     
-    def build(self):
-        return MainLayout()
-
     def update_ui(self, dt):
         """Update UI elements with current state — called every frame by Clock.schedule_interval"""
         # Update steering display
@@ -179,12 +205,4 @@ class RCControlCenterApp(App):
 
 if __name__ == "__main__":
     app = RCControlCenterApp()
-    root = app.build()
-    
-    # Bind button events from input.py — connect UI to network commands
-    setup_button_bindings(root.steering_panel, root.throttle_panel)
-    
-    # Start UI update loop (called every frame)
-    Clock.schedule_interval(app.update_ui, 1/30)  # ~30fps
-    
     app.run()

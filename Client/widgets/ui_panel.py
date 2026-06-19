@@ -16,6 +16,7 @@ Since we only need IP address management (no camera controls), this is simplifie
 import socket
 import threading
 from kivy.clock import Clock as KClock
+from kivy.network.urlrequest import UrlRequest
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.slider import Slider as KSlider
@@ -137,17 +138,17 @@ class PanelUI(BoxLayout):
             data, addr = sock.recvfrom(1024)
             
             if data == b"PONG":
-                Clock.schedule_once(lambda dt: self._on_probe_success())
+                KClock.schedule_once(lambda dt: self._on_probe_success())
             else:
-                Clock.schedule_once(lambda dt: self._on_probe_fail("WRONG RESPONSE"))
+                KClock.schedule_once(lambda dt: self._on_probe_fail("WRONG RESPONSE"))
                 
         except socket.timeout:
             # No response — device not reachable
-            Clock.schedule_once(lambda dt: self._on_probe_fail("NO RESPONSE"))
+            KClock.schedule_once(lambda dt: self._on_probe_fail("NO RESPONSE"))
             
         except Exception:
             # Connection error (network unreachable, etc.)
-            Clock.schedule_once(lambda dt: self._on_probe_fail("ERROR"))
+            KClock.schedule_once(lambda dt: self._on_probe_fail("ERROR"))
         
         finally:
             sock.close()
