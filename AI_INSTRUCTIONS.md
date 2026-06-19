@@ -15,3 +15,9 @@
 
 ## Logging
 - Centralized in main.py (global logger) — don't define separate loggers in every module unless absolutely necessary.
+
+## Kivy Property Names (CRITICAL)
+Kivy widget properties differ from what you might expect:
+- `foreground_color` (NOT `color`) — for text/label colors
+- `background_color` — for background colors
+- Never pass unknown kwargs to Kivy widgets (e.g., `color` on TextInput will crash with "Properties ['color'] passed to init may not be existing property names")
