@@ -13,6 +13,8 @@ In Kivy:
 Since we only need IP address management (no camera controls), this is simplified.
 """
 
+import socket
+import threading
 from kivy.clock import Clock as KClock
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
@@ -51,13 +53,13 @@ class PanelUI(BoxLayout):
         # Car IP input (TextInput — Kivy handles focus/IME natively)
         self.car_ip_input = KTextInput(
             text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
-            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1)
+            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
         
         # Phone IP input (placeholder — not needed for RC control)
         self.phone_ip_input = KTextInput(
             text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
-            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1)
+            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
         
         # Status label for connection feedback
@@ -68,7 +70,7 @@ class PanelUI(BoxLayout):
         # Connect button (replaces pygame's TextBox ENTER key handling)
         self.connect_btn = KButton(
             text="CONNECT", font_size=14, size_hint_x=None, width=80,
-            background_color=(0.29, 0.76, 0.31), color=(1, 1, 1)
+            background_color=(0.29, 0.76, 0.31, 1), color=(1, 1, 1, 1)
         )
         
         self.add_widget(car_ip_label)
@@ -101,36 +103,69 @@ class PanelUI(BoxLayout):
             return None
     
     def _connect(self, *args):
-        """Handle connect/disconnect button press"""
+        """Handle connect/disconnect button press — probes address via UDP"""
         import network
         
         ip = self.car_ip_input.text.strip()
         if not ip:
-            self.status_label.text = "ERROR"
-            self.status_label.color = (1, 0.3, 0.3)
+            self._show_status("NO IP", (1, 0.3, 0.3, 1))
             return
         
         result = self._validate_ip(ip)
         
         if not result:
-            # Show error — flash red briefly
-            self.status_label.text = "INVALID IP"
-            self.status_label.color = (1, 0.3, 0.3)
-            KClock.schedule_once(lambda dt: setattr(self.status_label, 'text', ''), 2)
+            self._show_status("INVALID IP", (1, 0.3, 0.3, 1))
             return
         
         ip_addr, port = result
         network.CAR_ADDR = (ip_addr, port)
         
+        # Probe in background thread — don't block UI
+        self.status_label.text = "CHECKING..."
+        self._show_status("CHECKING...", (1, 1, 0.3, 1))
+        
+        threading.Thread(target=self._probe_addr, args=(ip_addr, port), daemon=True).start()
+    
+    def _probe_addr(self, ip_addr, port):
+        """Background thread: probe address via UDP ping/PONG"""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(3)  # 3 second timeout
+        
         try:
-            # Try to connect — sends a PING to verify connection
-            network.send_sock.sendto(b"PING", (ip_addr, port))
+            sock.sendto(b"PING", (ip_addr, port))
             
-            self.status_label.text = "CONNECTED"
-            self.status_label.color = (0.3, 1, 0.3)
-        except Exception as e:
-            self.status_label.text = "FAILED"
-            self.status_label.color = (1, 0.3, 0.3)
+            data, addr = sock.recvfrom(1024)
+            
+            if data == b"PONG":
+                Clock.schedule_once(lambda dt: self._on_probe_success())
+            else:
+                Clock.schedule_once(lambda dt: self._on_probe_fail("WRONG RESPONSE"))
+                
+        except socket.timeout:
+            # No response — device not reachable
+            Clock.schedule_once(lambda dt: self._on_probe_fail("NO RESPONSE"))
+            
+        except Exception:
+            # Connection error (network unreachable, etc.)
+            Clock.schedule_once(lambda dt: self._on_probe_fail("ERROR"))
+        
+        finally:
+            sock.close()
+    
+    def _on_probe_success(self):
+        """Called from UI thread after successful probe"""
+        self.status_label.text = "CONNECTED"
+        self._show_status("CONNECTED", (0.3, 1, 0.3, 1))
+    
+    def _on_probe_fail(self, reason):
+        """Called from UI thread after failed probe"""
+        self.status_label.text = f"FAILED: {reason}"
+        self._show_status(f"FAILED: {reason}", (1, 0.3, 0.3, 1))
+    
+    def _show_status(self, text, color):
+        """Update status label with text and color"""
+        self.status_label.text = text
+        self.status_label.color = color
 
 
 class ZoomSlider(BoxLayout):
