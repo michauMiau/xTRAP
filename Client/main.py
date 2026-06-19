@@ -18,14 +18,8 @@ from kivy.uix.label import Label
 
 import threading
 from state import state
-from network import (
-    _start_network_loop, 
-    connect, 
-    disconnect, 
-    is_connected,
-    send_steering,
-    send_throttle,
-)
+from network import _start_network_loop, disconnect
+from input import send_steering, send_throttle
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 
@@ -137,7 +131,7 @@ class RCControlCenterApp(App):
         self.ui_panel.pos_hint = {"bottom": 0}
         root.add_widget(self.ui_panel)
         
-        # Bind buttons to send commands via network functions directly
+        # Bind buttons to send commands via input module
         self.steering_panel.left_btn.bind(on_press=self._on_steer_left)
         self.steering_panel.right_btn.bind(on_press=self._on_steer_right)
         
@@ -150,22 +144,22 @@ class RCControlCenterApp(App):
         return root
     
     def _on_steer_left(self, *a):
-        """Handle steering left — set state and send command via network"""
+        """Handle steering left — set state and send command via input module"""
         state.steer = 0
         send_steering(0)
     
     def _on_steer_right(self, *a):
-        """Handle steering right — set state and send command via network"""
+        """Handle steering right — set state and send command via input module"""
         state.steer = 180
         send_steering(180)
     
     def _on_throttle_reverse(self, *a):
-        """Handle throttle reverse — set state and send command via network"""
+        """Handle throttle reverse — set state and send command via input module"""
         state.throttle = -100
         send_throttle(-100)
     
     def _on_throttle_forward(self, *a):
-        """Handle throttle forward — set state and send command via network"""
+        """Handle throttle forward — set state and send command via input module"""
         state.throttle = 100
         send_throttle(100)
 
