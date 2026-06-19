@@ -8,13 +8,13 @@ Original (pygame):
 In Kivy:
 - Uses kivy.uix.label.Label for text display
 - Updates text and color in response to state.batt_pct changes
-- Called from update_ui() loop in main_kivy.py
+- Called from update_ui() loop in main.py
 """
 
 from kivy.uix.label import Label
 
 
-class BatteryKivy(Label):
+class Battery(Label):
     """Kivy battery widget — shows car battery percentage
     
     Replaces pygame's BatteryText which used font rendering and surface blitting.
@@ -28,7 +28,7 @@ class BatteryKivy(Label):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        self.state = None  # Will be set from main_kivy.py
+        self.state = None  # Will be set from main.py
         
         # Default display
         self.text = "Car: 0%"

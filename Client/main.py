@@ -19,9 +19,9 @@ from kivy.uix.label import Label
 import threading
 from state import state
 from network import _start_network_loop, disconnect
-from input import send_steering, send_throttle
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
+from input import setup_button_bindings
 
 
 class SteeringPanel(FloatLayout):
@@ -29,6 +29,9 @@ class SteeringPanel(FloatLayout):
     
     def __init__(self):
         super().__init__()
+        
+        self.left_btn = None
+        self.right_btn = None
         
         # Left/Right buttons for steering (touch/PC)
         self.left_btn = KButton(text="◄", font_size=48, size_hint=(0.35, 1))
@@ -131,37 +134,7 @@ class RCControlCenterApp(App):
         self.ui_panel.pos_hint = {"bottom": 0}
         root.add_widget(self.ui_panel)
         
-        # Bind buttons to send commands via input module
-        self.steering_panel.left_btn.bind(on_press=self._on_steer_left)
-        self.steering_panel.right_btn.bind(on_press=self._on_steer_right)
-        
-        self.throttle_panel.reverse_btn.bind(on_press=self._on_throttle_reverse)
-        self.throttle_panel.forward_btn.bind(on_press=self._on_throttle_forward)
-        
-        # Schedule UI update loop (replaces pygame clock.tick)
-        Clock.schedule_interval(self.update_ui, 1/60)  # 60 FPS like original
-        
         return root
-    
-    def _on_steer_left(self, *a):
-        """Handle steering left — set state and send command via input module"""
-        state.steer = 0
-        send_steering(0)
-    
-    def _on_steer_right(self, *a):
-        """Handle steering right — set state and send command via input module"""
-        state.steer = 180
-        send_steering(180)
-    
-    def _on_throttle_reverse(self, *a):
-        """Handle throttle reverse — set state and send command via input module"""
-        state.throttle = -100
-        send_throttle(-100)
-    
-    def _on_throttle_forward(self, *a):
-        """Handle throttle forward — set state and send command via input module"""
-        state.throttle = 100
-        send_throttle(100)
 
     def update_ui(self, dt):
         """Update UI elements with current state — called every frame by Clock.schedule_interval"""
@@ -185,4 +158,13 @@ class RCControlCenterApp(App):
 
 
 if __name__ == "__main__":
-    RCControlCenterApp().run()
+    app = RCControlCenterApp()
+    root = app.build()
+    
+    # Bind button events from input.py — connect UI to network commands
+    setup_button_bindings(app.steering_panel, app.throttle_panel)
+    
+    # Start UI update loop (called every frame)
+    Clock.schedule_interval(app.update_ui, 1/30)  # ~30fps
+    
+    app.run()
