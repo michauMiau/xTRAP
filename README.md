@@ -13,7 +13,7 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 
 - Python 3.10+ with Pygame (`pip install kivy`)
 - GL libraries for Kivy
-- ESP32 board flashed with MicroHydra 
+- Cardputer board flashed with MicroHydra 
 - WiFi connection between the Cardputer and PC
 
 The client connects to the robot's IP on port 5006 for steering commands and listens on port 5005 for sensor data.
@@ -21,7 +21,7 @@ The client connects to the robot's IP on port 5006 for steering commands and lis
 ### Running on the Cardputeer
 
 - `rcar.py` — main firmware: reads accelerometer, sends UDP telemetry, receives steering commands from PC, controls servo
-- `Acceleration live recorder.py` — standalone Cardputer app for testing the accelerometer
+- `Acceleration_live_recorder.py` — standalone Cardputer app for testing the accelerometer
 
 ## Hardware
 
@@ -29,7 +29,7 @@ The client connects to the robot's IP on port 5006 for steering commands and lis
 | --------- | ------- |
 | ESP32 / Micropython | Main controller on Cardputer |
 | BMI270 (I²C) | 6-DoF accelerometer/gyro for orientation + G-force detection |
-| Servo (pin 4) | Steering control — receives angle commands from PC |
+| Servo | Steering control — receives angle commands from PC |
 | Motor controller | Drives motor for movement |
 
 ## Network Protocol
@@ -52,7 +52,7 @@ All communication is over raw UDP:
 ### In Progress 🚧
 
 - Motor acceleration
-- Brakes implementation (mechanical or regen braking?)
+- Brakes implementation (set throttle to 0 or slight reverse?)
 
 ### Feature Creep 📋
 
