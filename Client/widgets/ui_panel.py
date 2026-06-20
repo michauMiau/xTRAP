@@ -10,7 +10,6 @@ In Kivy:
 - Use kivy.uix.slider.Slider for sliders
 - Use kivy.uix.textinput.TextInput for text input
 
-Since we only need IP address management (no camera controls), this is simplified.
 """
 
 import socket
