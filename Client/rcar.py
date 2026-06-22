@@ -78,8 +78,8 @@ class Servo:
 servo = Servo(4)  # your servo pin
 
 class Motor:
-    def __init__():
-    # TODO: Implement PWM variable motor control
+    def __init__(self):
+        pass  # TODO: Implement PWM variable motor control
 
 # Setup connections
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

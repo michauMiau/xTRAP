@@ -12,7 +12,7 @@ from kivy.uix.label import Label
 
 import threading
 from state import state
-from network import _start_network_loop, disconnect
+import network as net
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 from input import setup_button_bindings
@@ -169,12 +169,8 @@ class RCControlCenterApp(App):
         # Start UI update loop (called every frame by Clock.schedule_interval)
         Clock.schedule_interval(self.update_ui, 1/30)  # ~30fps
         
-        _start_network_loop()
+        net.network_loop()
 
-    def on_stop(self):
-        """Cleanup — stop network thread and close sockets on exit."""
-        disconnect()
-    
     def update_ui(self, dt):
         """Update UI elements with current state — called every frame by Clock.schedule_interval"""
         # Update steering display
