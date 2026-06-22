@@ -6,6 +6,7 @@ from lib.hydra.config import Config
 from lib.userinput import bmi270
 from lib.battlevel import Battery
 from machine import I2C, Pin, PWM
+import gc
 # This code is NOT ISO 270001 Compliant
 
 batt = Battery()
@@ -68,9 +69,8 @@ class Servo:
     def set_angle(self, angle):
         angle = max(0, min(180, angle))
         self.angle = angle
-        print(f"SET angle {angle}")
+        print("S" + str(angle))
         pulse = int(500 + (angle / 180) * 2000)
-
         for _ in range(3):
             self.write_pulse(pulse)
             time.sleep_ms(20)
@@ -98,7 +98,6 @@ class Motor:
             self.speed.duty_u16(int(speed * 327.68))
         else:
             self.speed.duty_u16(0)
-        print(f"MOTOR {speed}%")
 
 motor = Motor()
 
@@ -110,10 +109,30 @@ sock.setblocking(False)
 # --- MAIN LOOP ---
 connect_wifi()
 
+log = None
 last_stats_time = 0
+gc_collect_at = 0
+print_flush_at = 0
+PRINT_BUF = ""
+
+def log(msg):
+    global PRINT_BUF, print_flush_at
+    PRINT_BUF += msg + "\r\n"
+    if time.ticks_diff(time.ticks_ms(), print_flush_at) > 200:
+        print(PRINT_BUF, end="")
+        PRINT_BUF = ""
+        print_flush_at = time.ticks_ms()
+
+def gc_collect():
+    global gc_collect_at
+    now = time.ticks_ms()
+    if time.ticks_diff(now, gc_collect_at) > 30000:
+        gc.collect()
+        gc_collect_at = now
 
 while True:
     now = time.ticks_ms()
+    gc_collect()
 
     # --- FAST ---
 #    ax, ay, az = read_accel() # Disabled Sending the IMU data to prevent feature creep
@@ -134,7 +153,7 @@ while True:
         if parts[0] == "T" and len(parts) > 1:
             throttle = int(parts[1])
             motor.run(throttle)
-            print(f"T{throttle}%")
+            print("T" + str(throttle) + "%")
     except Exception:
         pass
 
