@@ -2,13 +2,6 @@
 
 import os
 import sys
-# Detect optimal Kivy GL backend (respect user override if set)
-if not os.environ.get("KIVY_GL_BACKEND"):
-    # Wayland-only systems need desktop OpenGL, not EGL
-    has_x11 = bool(os.environ.get("DISPLAY") or "x11" in sys.platform)
-    if not has_x11:
-        os.environ["KIVY_GL_BACKEND"] = "gl"
-
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.clock import Clock
