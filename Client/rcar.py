@@ -68,7 +68,7 @@ class Servo:
     def set_angle(self, angle):
         angle = max(0, min(180, angle))
         self.angle = angle
-        print("SET angle" + angle)
+        print(f"SET angle {angle}")
         pulse = int(500 + (angle / 180) * 2000)
 
         for _ in range(3):
@@ -77,9 +77,30 @@ class Servo:
 
 servo = Servo(4)  # your servo pin
 
+# --- MOTOR (H-Bridge PWM) ---
+# H-bridge direction pins — one per side of the tracked robot
+DIR_LEFT = Pin(39, Pin.OUT)  # left motor direction
+DIR_RIGHT = Pin(40, Pin.OUT)  # right motor direction
+
 class Motor:
     def __init__(self):
-        pass  # TODO: Implement PWM variable motor control
+        self.speed = PWM(Pin(21))  # PWM speed pin (left side of H-bridge input)
+        self.speed.freq(50)          # Low freq for H-bridge PWM signal
+        self.speed.duty_u16(0)       # Start stopped
+
+    def run(self, speed):
+        """Set motor speed — speed is -100 (full reverse) to 100 (full forward)."""
+        if speed < 0:
+            DIR_LEFT.value(True); DIR_RIGHT.value(False)
+            self.speed.duty_u16(int(-speed * 327.68))  # 0..65535 from abs(speed)
+        elif speed > 0:
+            DIR_LEFT.value(False); DIR_RIGHT.value(True)
+            self.speed.duty_u16(int(speed * 327.68))
+        else:
+            self.speed.duty_u16(0)
+        print(f"MOTOR {speed}%")
+
+motor = Motor()
 
 # Setup connections
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -110,10 +131,10 @@ while True:
             angle = int(parts[1])
             servo.set_angle(angle)
 
-        if parts[0] == "T" and len(parts) > 1: # TO DO: groundwork for throttle
+        if parts[0] == "T" and len(parts) > 1:
             throttle = int(parts[1])
-#            servo.set_angle(angle)
-            print("Received" + throttle)
+            motor.run(throttle)
+            print(f"T{throttle}%")
     except Exception:
         pass
 
