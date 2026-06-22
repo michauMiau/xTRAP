@@ -4,7 +4,7 @@ import math
 from state import state
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-CAR_ADDR = ("192.168.1.174", 5006)
+CAR_ADDR = ("192.168.1.225", 5006)
 
 PORT_RECV = 5005
 

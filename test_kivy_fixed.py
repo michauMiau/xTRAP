@@ -14,7 +14,7 @@ from kivy.utils import get_color_from_hex as color
 # --- UDP setup (same as pygame client) ---
 import socket, threading, time
 
-car_addr = {"ip": "192.168.1.171", "port": 4000}
+car_addr = {"ip": "192.168.1.17", "port": 4000}
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 connected = False
 
