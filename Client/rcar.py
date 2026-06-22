@@ -80,6 +80,7 @@ servo = Servo(4)  # your servo pin
 class Motor:
     def __init__():
     # TODO: Implement PWM variable motor control
+
 # Setup connections
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("0.0.0.0", PORT))
@@ -112,7 +113,7 @@ while True:
         if parts[0] == "T" and len(parts) > 1: # TO DO: groundwork for throttle
             throttle = int(parts[1])
 #            servo.set_angle(angle)
-
+            print("Received" + throttle)
     except Exception:
         pass
 
