@@ -1,5 +1,4 @@
-# "host.py" file, minify, compile into .mpy for production or something?
-import time
+""" "host.py" file, minify, compile into .mpy for production or something? """
 import socket
 import network
 from lib.hydra.config import Config
@@ -19,7 +18,7 @@ nic.config(pm=0) # Tried to disable power managment on the wifi chip
 
 # --- UDP ---
 HOST_IP = "192.168.1.234"  # TODO: your PC IP
-PORT = 5005
+PORT = 5005 #
 
 def connect_wifi():
     if not nic.active():
