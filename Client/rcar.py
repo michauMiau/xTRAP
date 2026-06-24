@@ -108,19 +108,9 @@ sock.setblocking(False)
 # --- MAIN LOOP ---
 connect_wifi()
 
-log = None
 last_stats_time = 0
 gc_collect_at = 0
-print_flush_at = 0
-PRINT_BUF = ""
 
-def log(msg):
-    global PRINT_BUF, print_flush_at
-    PRINT_BUF += msg + "\r\n"
-    if time.ticks_diff(time.ticks_ms(), print_flush_at) > 200:
-        print(PRINT_BUF, end="")
-        PRINT_BUF = ""
-        print_flush_at = time.ticks_ms()
 
 def gc_collect():
     global gc_collect_at
