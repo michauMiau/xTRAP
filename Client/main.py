@@ -23,6 +23,7 @@ import network as net
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 from input import setup_button_bindings
+import gamepad
 
 
 class StatusPanel(BoxLayout):
@@ -182,6 +183,10 @@ class RCControlCenterApp(App):
         # Set up button bindings — self.root is now available via Kivy's init
         setup_button_bindings(self.root.steering_panel, self.root.throttle_panel)
         
+        # Initialize gamepad controller input (SDL2-based, works on Steam Deck / Linux desktop)
+        if not gamepad.init_gamepad():
+            print("gamepad: no SDL2 found — skipping controller input")
+        
         # Start UI update loop (called every frame by Clock.schedule_interval)
         Clock.schedule_interval(self.update_ui, 1/30)  # ~30fps
         
@@ -189,6 +194,14 @@ class RCControlCenterApp(App):
 
     def update_ui(self, dt):
         """Update UI elements with current state — called every frame by Clock.schedule_interval"""
+        # Poll gamepad for controller input (overrides buttons when connected)
+        gp = gamepad.update_gamepad(dt)
+        if gp and not all(v is None for v in gp):
+            steer_angle, throttle_val = gp
+            if steer_angle is not None:
+                state.steer = steer_angle
+            if throttle_val != 0:
+                state.throttle = int(throttle_val)
         # Update steering display
         self.root.steering_panel.steer_display.text = f"Steering: {state.steer}°"
         
