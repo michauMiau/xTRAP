@@ -152,7 +152,7 @@ while True:
         if parts[0] == "T" and len(parts) > 1:
             throttle = int(parts[1])
             motor.run(throttle)
-            print("T" + str(throttle) + "%")
+            print("T" + str(throttle))
     except Exception:
         pass
 
