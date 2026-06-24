@@ -60,22 +60,30 @@ class SteeringPanel(BoxLayout):
     def __init__(self):
         super().__init__()
         
-        # Horizontal layout: [left_btn] [steer_display] [right_btn]
+        # Horizontal layout: [left_btn] [center_btn] [steer_display] [right_btn]
         self.orientation = "horizontal"
         self.size_hint_y = None
         self.height = 60
         
         # Left/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.left_btn = KButton(
-            text="<", font_size=48, size_hint_x=None, width=60,
-            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
-        )
-        self.right_btn = KButton(
-            text=">", font_size=48, size_hint_x=None, width=60,
+            text="<", font_size=32, size_hint_x=None, width=45,
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
         
-        # Steering display - centered between buttons
+        # Center steering button — returns steering to 90°
+        self.center_btn = KButton(
+            text="|", font_size=32, size_hint_x=None, width=45,
+            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
+        )
+        
+        # Right/Right buttons for steering (touch/PC) - ASCII arrows < >
+        self.right_btn = KButton(
+            text=">", font_size=32, size_hint_x=None, width=45,
+            background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
+        )
+        
+        # Steering display — centered between buttons
         self.steer_display = Label(
             text=f"Steering: {state.steer}°", 
             font_size=24, 
@@ -83,6 +91,7 @@ class SteeringPanel(BoxLayout):
         )
         
         self.add_widget(self.left_btn)
+        self.add_widget(self.center_btn)
         self.add_widget(self.steer_display)
         self.add_widget(self.right_btn)
 

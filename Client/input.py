@@ -16,16 +16,10 @@ import network as net
 log = logging.getLogger(__name__)
 
 
-def on_steer_left(*a):
-    """Handle steering left -- set state and send command via network."""
-    state.steer = 45
-    net.send_steering(45)
-
-
-def on_steer_right(*a):
-    """Handle steering right -- set state and send command via network."""
-    state.steer = 135
-    net.send_steering(135)
+def set_steer(*a, angle: float = 90):
+    """Set steering to a given angle and send command via network."""
+    state.steer = int(angle)
+    net.send_steering(int(angle))
 
 
 def on_throttle_reverse(*a):
@@ -46,15 +40,16 @@ def setup_button_bindings(steering_panel, throttle_panel):
     Called from main.py's build() method after panels are created.
 
     Args:
-        steering_panel: SteeringPanel instance with left_btn/right_btn
+        steering_panel: SteeringPanel instance with left_btn/center_btn/right_btn
         throttle_panel: ThrottlePanel instance with reverse_btn/forward_btn
     """
     if steering_panel is None or throttle_panel is None:
         return
 
-    # Wire steering buttons
-    steering_panel.left_btn.bind(on_press=on_steer_left)
-    steering_panel.right_btn.bind(on_press=on_steer_right)
+    # Wire steering buttons (left = 45, center = 90, right = 135)
+    steering_panel.left_btn.bind(on_press=lambda *a: set_steer(angle=45))
+    steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=90))
+    steering_panel.right_btn.bind(on_press=lambda *a: set_steer(angle=135))
 
     # Wire throttle buttons
     throttle_panel.reverse_btn.bind(on_press=on_throttle_reverse)
