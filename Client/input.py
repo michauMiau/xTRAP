@@ -22,6 +22,14 @@ def set_steer(*a, angle: float = 90):
     net.send_steering(int(angle))
 
 
+def set_throttle(level):
+    if level > 100: # Handling if input is incorrect
+        level = 100
+    if level < -100:
+        level = -100
+    state.throttle = level
+    net.send_throttle
+
 def on_throttle_reverse(*a):
     """Handle throttle reverse -- set state and send command via network."""
     state.throttle = -100
@@ -46,13 +54,13 @@ def setup_button_bindings(steering_panel, throttle_panel):
     if steering_panel is None or throttle_panel is None:
         return
 
-    # Wire steering buttons (left = 45, center = 90, right = 135)
+    # Wire steering buttons (adjustable)
     steering_panel.left_btn.bind(on_press=lambda *a: set_steer(angle=45))
     steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=90))
     steering_panel.right_btn.bind(on_press=lambda *a: set_steer(angle=135))
 
     # Wire throttle buttons
-    throttle_panel.reverse_btn.bind(on_press=on_throttle_reverse)
+    throttle_panel.reverse_btn.bind(on_press=on_throttle_reverse) # TODO: add release action to set to 0 using set_throttle
     throttle_panel.forward_btn.bind(on_press=on_throttle_forward)
 
 
