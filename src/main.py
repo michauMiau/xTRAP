@@ -83,7 +83,7 @@ class SteeringPanel(BoxLayout):
         self.steer_display = Label(
             text=f"Steering: {state.steer}°", 
             font_size=24, 
-            size_hint_x=None, width=100
+            size_hint_x=5, width=100
         )
         
         self.add_widget(self.left_btn)
@@ -113,7 +113,7 @@ class ThrottlePanel(BoxLayout):
         self.throttle_display = Label(
             text=f"Throttle: {state.throttle}%", 
             font_size=24, 
-            size_hint_x=None, width=100
+            size_hint_x=5, width=100
         )
         
         # Forward/Throttle button (right) - ASCII arrow >
