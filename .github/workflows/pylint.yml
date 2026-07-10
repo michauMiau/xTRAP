@@ -1,6 +1,18 @@
 name: Pylint
 
-on: [push]
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/build-apk.yml'
+      - 'buildozer.spec'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/build-apk.yml'
+      - 'buildozer.spec'
 
 jobs:
   build:
