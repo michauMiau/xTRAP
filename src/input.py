@@ -3,7 +3,7 @@
 In Kivy, input comes from:
 1. Kivy widget bindings (buttons in UI panels)
 2. Keyboard/gamepad events -- handled here via Kivy's event system
-
+Also DO NOT DUPLICATE FUNCTIONS OMFG!!
 This module provides the high-level functions that buttons call to send commands.
 """
 
@@ -27,38 +27,26 @@ def set_throttle(level):
     state.throttle = level
     net.send_throttle(int(level))
 
+def release_steer():
+    set_steer(90)
 
-def release_steer(*a):
-    """Return steering to center (90°) on button release."""
-    set_steer(angle=90)
-
-
-def release_throttle(*a):
-    """Return throttle to 0 on button release."""
+def release_throttle():
     set_throttle(0)
 
-
-def on_throttle_reverse(*a):
-    """Handle throttle reverse -- set state and send command via network."""
-    state.throttle = -100
-    net.send_throttle(-100)
-
-
-def on_throttle_forward(*a):
-    """Handle throttle forward -- set state and send command via network."""
-    state.throttle = 100
-    net.send_throttle(100)
-
-
+def on_joy_axis(self, win, stickid, axisid, value):
+    print(win, stickid, axisid, value)
+    # TODO: Implement steering and throttle with controller
+    # 2 axis 0 for steering, 7 axis 2 for reverse throttle,  8 axis 5 for throttle
 def setup_button_bindings(steering_panel, throttle_panel):
     """Bind input handlers to UI buttons.
-
     Called from main.py's build() method after panels are created.
-
     Args:
         steering_panel: SteeringPanel instance with left_btn/center_btn/right_btn
         throttle_panel: ThrottlePanel instance with reverse_btn/forward_btn
     """
+    # Setup bind for joystick events
+    Window.bind(on_joy_axis=self.on_joy_axis)
+
     if steering_panel is None or throttle_panel is None:
         return
 
@@ -67,7 +55,9 @@ def setup_button_bindings(steering_panel, throttle_panel):
         on_press=lambda *a: set_steer(angle=45),
         on_release=lambda *a: release_steer(),
     )
+
     steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=90))
+    
     steering_panel.right_btn.bind(
         on_press=lambda *a: set_steer(angle=135),
         on_release=lambda *a: release_steer(),
@@ -75,16 +65,10 @@ def setup_button_bindings(steering_panel, throttle_panel):
 
     # Wire throttle buttons -- release returns to 0
     throttle_panel.reverse_btn.bind(
-        on_press=on_throttle_reverse,
+        on_press=set_throttle(-100),
         on_release=lambda *a: release_throttle(),
     )
     throttle_panel.forward_btn.bind(
-        on_press=on_throttle_forward,
+        on_press=set_throttle(100),
         on_release=lambda *a: release_throttle(),
     )
-
-
-def on_steer_center(*a):
-    """Handle center steering -- set state and send command via network."""
-    state.steer = 90
-    net.send_steering(90)
