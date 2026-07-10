@@ -22,8 +22,7 @@ def set_steer(*a, angle: float = 90):
 
 def set_throttle(level):
     # Handling if input is incorrect
-    level = max(level, 100)
-    level = min(level, -100)
+    level = max(-100, min(100, level))  # Clamp to [-100, 100]
     state.throttle = level
     net.send_throttle(int(level))
 
@@ -68,10 +67,10 @@ def setup_button_bindings(steering_panel, throttle_panel):
 
     # Wire throttle buttons -- release returns to 0
     throttle_panel.reverse_btn.bind(
-        on_press=set_throttle(-100),
+        on_press=lambda *a: set_throttle(-100),
         on_release=lambda *a: release_throttle(),
     )
     throttle_panel.forward_btn.bind(
-        on_press=set_throttle(100),
+        on_press=lambda *a: set_throttle(100),
         on_release=lambda *a: release_throttle(),
     )
