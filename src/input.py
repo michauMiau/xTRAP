@@ -21,10 +21,9 @@ def set_steer(*a, angle: float = 90):
 
 
 def set_throttle(level):
-    if level > 100: # Handling if input is incorrect
-        level = 100
-    if level < -100:
-        level = -100
+    # Handling if input is incorrect
+    level = max(level, 100)
+    level = min(level, -100)
     state.throttle = level
     net.send_throttle(int(level))
 
