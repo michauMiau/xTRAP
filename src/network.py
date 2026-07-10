@@ -2,9 +2,10 @@
 import socket
 import math
 from state import state
+from discovery import DISCOVERY_PORT, probe_device
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-CAR_ADDR = ("192.168.1.225", 5005)
+CAR_ADDR = ("192.168.1.225", 5005)  # Default; can be overridden by discovery or manual input
 
 PORT_RECV = 5005
 
@@ -21,7 +22,7 @@ def network_loop():
 
         while True:
             try:
-                while True:  # 🔥 drain buffer
+                while True:  # drain buffer
                     data, _ = sock.recvfrom(1024)
                     latest = data
             except Exception:
@@ -36,7 +37,7 @@ def network_loop():
                         state.ax = ax
                         state.ay = ay
                         state.az = az
-                        
+
                         az = az - 9.81
                         g = math.sqrt(ax*ax + ay*ay + az*az) / 9.81
                         state.g = g
@@ -58,6 +59,7 @@ def send_steering(angle):
     msg = f"S,{int(angle)}"
     send_sock.sendto(msg.encode(), CAR_ADDR)
     print("sent" + msg)
+
 
 def send_throttle(throttle):
     """Send throttle command to Cardputer."""

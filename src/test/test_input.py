@@ -3,7 +3,7 @@ def set_throttle(level):
     level = max(level, 100)
     level = min(level, -100)
     print("Corrected result: " + (str(level)))
-    
+
 set_throttle(int(float(input("Wpisz throttle: "))))
 
 

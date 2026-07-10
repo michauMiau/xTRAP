@@ -59,7 +59,7 @@ def setup_button_bindings(steering_panel, throttle_panel):
     )
 
     steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=90))
-    
+
     steering_panel.right_btn.bind(
         on_press=lambda *a: set_steer(angle=135),
         on_release=lambda *a: release_steer(),
