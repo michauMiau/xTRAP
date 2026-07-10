@@ -2,12 +2,8 @@
 
 import os
 import sys
-# Detect optimal Kivy GL backend (respect user override if set)
-if not os.environ.get("KIVY_GL_BACKEND"):
-    # Wayland-only systems need desktop OpenGL, not EGL
-    has_x11 = bool(os.environ.get("DISPLAY") or "x11" in sys.platform)
-    if not has_x11:
-        os.environ["KIVY_GL_BACKEND"] = "gl"
+
+os.environ["KIVY_GL_BACKEND"] = "gl"
         
 from kivy.app import App
 from kivy.core.window import Window
@@ -161,9 +157,9 @@ class MainLayout(GridLayout):
         self.add_widget(self.ui_panel)
 
 
+
 class RCControlCenterApp(App):
-    """Main Kivy application — cross-platform RC control center"""
-    
+    """Main Kivy application — cross-platform RC control center""" 
     def __init__(self):
         super().__init__()
         
@@ -182,8 +178,9 @@ class RCControlCenterApp(App):
         # Set up button bindings — self.root is now available via Kivy's init
         setup_button_bindings(self.root.steering_panel, self.root.throttle_panel)
         
+
         # Start UI update loop (called every frame by Clock.schedule_interval)
-        Clock.schedule_interval(self.update_ui, 1/30)  # ~30fps
+        Clock.schedule_interval(self.update_ui, 1/40)  # ~40fps
         
         net.network_loop()
 
@@ -206,6 +203,8 @@ class RCControlCenterApp(App):
         
         # Update G-meter display  
         self.root.status_panel.g_label.text = f"G: {state.g:.2f} MAX: {state.max_g:.2f}"
+
+
 
 
 if __name__ == "__main__":

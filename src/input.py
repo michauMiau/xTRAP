@@ -1,10 +1,8 @@
 """Input handling for Kivy RC client -- keyboard, gamepad, and UI button input.
 
-Replaces the original pygame version which used key.get_pressed() for steering.
-
 In Kivy, input comes from:
-1. Kivy widget bindings (buttons in UI panels) -- handled by main.py button.on_press callbacks
-2. Keyboard/gamepad events -- handled here via Kivy's event system or SDL2 gamepad API
+1. Kivy widget bindings (buttons in UI panels)
+2. Keyboard/gamepad events -- handled here via Kivy's event system
 
 This module provides the high-level functions that buttons call to send commands.
 """
@@ -41,6 +39,9 @@ def on_throttle_forward(*a):
     state.throttle = 100
     net.send_throttle(100)
 
+def on_joy_axis(self, win, stickid, axisid, value):
+    print(win, stickid, axisid, value)
+ # TODO: Implement the controller steering and throttle 
 
 def setup_button_bindings(steering_panel, throttle_panel):
     """Bind input handlers to UI buttons.
@@ -51,11 +52,14 @@ def setup_button_bindings(steering_panel, throttle_panel):
         steering_panel: SteeringPanel instance with left_btn/center_btn/right_btn
         throttle_panel: ThrottlePanel instance with reverse_btn/forward_btn
     """
+    # Init the joystick bind
+    Window.bind(on_joy_axis=self.on_joy_axis)
+
     if steering_panel is None or throttle_panel is None:
         return
 
     # Wire steering buttons (adjustable)
-    steering_panel.left_btn.bind(on_press=lambda *a: set_steer(angle=45))
+    steering_panel.left_btn.bind(on_press=lambda *a: set_steer(angle=45)) # TODO: Implement center on release
     steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=90))
     steering_panel.right_btn.bind(on_press=lambda *a: set_steer(angle=135))
 

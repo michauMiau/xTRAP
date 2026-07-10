@@ -17,8 +17,8 @@ config = Config()
 nic.config(pm=0) # Tried to disable power managment on the wifi chip
 
 # --- UDP ---
-HOST_IP = "192.168.1.234"  # TODO: your PC IP
-PORT = 5005 #
+HOST_IP = "192.168.1.234"  # TODO: maybe implement some kind of system to automatically get computer ip?
+PORT = 5005
 
 def connect_wifi():
     if not nic.active():
@@ -48,6 +48,7 @@ def read_accel():
     except Exception:
         return 0.0, 0.0, 0.0
 
+
 # CONFIGURING THE SCREEN BACKLIGHT PWM SO IT DOESN'T GO CRAZY
 BACKLIGHT_PIN = 38  # Skip this whole section if you don't have a cardputer/backlight
 backlight = PWM(Pin(BACKLIGHT_PIN))
@@ -58,7 +59,7 @@ backlight.duty(0)        # Backlight off
 class Servo:
     def __init__(self, pin):
         self.pin = Pin(pin, Pin.OUT)
-        self.angle = 90
+        self.angle = 90 # Set 90 as default
 
     def write_pulse(self, us):
         self.pin.on()
@@ -73,14 +74,12 @@ class Servo:
         for _ in range(3):
             self.write_pulse(pulse)
             time.sleep_ms(20)
-
-servo = Servo(4)  # your servo pin
+servo = Servo(3)  # your servo pin
 
 # --- MOTOR (H-Bridge PWM) ---
 # H-bridge direction pins — one per side of the tracked robot
-DIR_LEFT = Pin(39, Pin.OUT)  # left motor direction
-DIR_RIGHT = Pin(40, Pin.OUT)  # right motor direction
-
+DIR_LEFT = Pin(4, Pin.OUT)  # left motor direction
+DIR_RIGHT = Pin(6, Pin.OUT)  # right motor direction
 class Motor:
     def __init__(self):
         self.speed = PWM(Pin(21))  # PWM speed pin (left side of H-bridge input)
@@ -97,7 +96,6 @@ class Motor:
             self.speed.duty_u16(int(speed * 327.68))
         else:
             self.speed.duty_u16(0)
-
 motor = Motor()
 
 # Setup connections
