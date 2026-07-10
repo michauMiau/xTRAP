@@ -1,4 +1,4 @@
-"""Device discovery via UDP multicast (239.255.0.1:5006)
+"""Device discovery via UDP multicast (239.255.0.1:5006).
 
 Both Cardputer and Kivy app broadcast their presence periodically.
 This eliminates hardcoded IPs from the codebase.
@@ -21,11 +21,16 @@ def get_local_ip():
     """Get device's local IP on active network interface."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("192.168.1.1", 53))
+        s.connect(("8.8.8.8", 53))  # Google DNS — no real route needed
         ip = s.getsockname()[0]
         s.close()
         return ip
     except OSError:
+        import netifaces
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface).get(netifaces.AF_INET, [])
+            if addrs and not addrs[0].get("addr", "").startswith("127."):
+                return addrs[0]["addr"]
         return "unknown"
 
 
@@ -71,9 +76,13 @@ def start_discovery_listener(callback):
             try:
                 data, addr = sock.recvfrom(1024)
                 msg = json.loads(data.decode())
-                if msg.get("type") == "xtrap-discovery" and "ip" in msg:
-                    Clock.schedule_once(lambda dt, m=msg: callback(m["ip"], m["port"]), 0)
-            except Exception:
+                if (msg.get("type") == "xtrap-discovery"
+                        and isinstance(msg.get("ip"), str)
+                        and isinstance(msg.get("port"), int)):
+                    Clock.schedule_once(
+                        lambda dt, m=msg: callback(m["ip"], m["port"]), 0
+                    )
+            except (json.JSONDecodeError, KeyError):
                 pass
 
         sock.close()
@@ -91,7 +100,8 @@ def start_broadcasting(interval=BROADCAST_INTERVAL):
         while True:
             try:
                 ip = get_local_ip()
-                broadcast_device(ip, DISCOVERY_PORT)
+                if ip != "unknown":
+                    broadcast_device(ip, DISCOVERY_PORT)
             except Exception:
                 pass
             time_mod.sleep(interval)
