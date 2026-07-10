@@ -33,10 +33,14 @@ def release_steer():
 def release_throttle():
     set_throttle(0)
 
-def on_joy_axis(self, win, stickid, axisid, value):
-    print(win, stickid, axisid, value)
-    # TODO: Implement steering and throttle with controller
-    # 2 axis 0 for steering, 7 axis 2 for reverse throttle,  8 axis 5 for throttle
+#def setup_joystick(self): # This function doesn't work: NameError: name 'Window' is not defined,  AttributeError: 'RCControlCenterApp' object has no attribute 'on_joy_axis'
+    # Setup bind for joystick events
+#    Window.bind(on_joy_axis=self.on_joy_axis)
+#    def on_joy_axis(self, win, stickid, axisid, value):
+#        print(win, stickid, axisid, value)
+        # TODO: Implement steering and throttle with controller
+        # 2 axis 0 for steering, 7 axis 2 for reverse throttle,  8 axis 5 for throttle
+
 def setup_button_bindings(steering_panel, throttle_panel):
     """Bind input handlers to UI buttons.
     Called from main.py's build() method after panels are created.
@@ -44,8 +48,7 @@ def setup_button_bindings(steering_panel, throttle_panel):
         steering_panel: SteeringPanel instance with left_btn/center_btn/right_btn
         throttle_panel: ThrottlePanel instance with reverse_btn/forward_btn
     """
-    # Setup bind for joystick events
-    Window.bind(on_joy_axis=self.on_joy_axis)
+
 
     if steering_panel is None or throttle_panel is None:
         return

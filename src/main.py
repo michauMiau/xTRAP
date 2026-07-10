@@ -204,9 +204,6 @@ class RCControlCenterApp(App):
         # Update G-meter display  
         self.root.status_panel.g_label.text = f"G: {state.g:.2f} MAX: {state.max_g:.2f}"
 
-
-
-
 if __name__ == "__main__":
     app = RCControlCenterApp()
     app.run()
