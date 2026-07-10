@@ -13,7 +13,7 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 
 - Python 3.10+ with Pygame (`pip install kivy`)
 - GL libraries for Kivy
-- Cardputer board flashed with MicroHydra 
+- Cardputer board flashed with MicroHydra
 - WiFi connection between the Cardputer and PC
 
 The client connects to the robot's IP on port 5006 for steering commands and listens on port 5005 for sensor data.

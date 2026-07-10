@@ -6,7 +6,7 @@ xTRAP (eXtensible Robotic Technic Automation Platform) is a modular, remote-cont
 
 ## System Diagram
 
-```
+```text
 ┌──────────────┐           UDP          ┌─────────────────┐
 │              │  S,<angle> ←──────────→ │                 │
 │   Cardputer  │                        │    PC Client    │
@@ -26,6 +26,7 @@ The robot runs Micropython on an ESP32/LeafLabs board mounted inside the Cardput
 #### rcar.py — Main Control Firmware
 
 **Responsibilities:**
+
 - WiFi connection management (`Config` class for SSID/password)
 - Steering command reception and servo actuation
 - Battery level telemetry broadcast via UDP
@@ -33,8 +34,9 @@ The robot runs Micropython on an ESP32/LeafLabs board mounted inside the Cardput
 > **Note:** IMU (accelerometer) data sending is currently disabled to prevent feature creep. The robot only sends battery level over UDP. Accelerometer logging is available locally on the Cardputer's SD card.
 
 **Key Modules:**
+
 | Module | Pin/Address | Purpose |
-|--------|-------------|---------|
+| ------ | ----------- | ------- |
 | WiFi | STA_IF | Station mode, connects to local network |
 | I²C | 0 | Bus for BMI270 accelerometer (local use only) |
 | Battery | ADC pin | Reads battery percentage via `battlevel` library |
@@ -42,10 +44,12 @@ The robot runs Micropython on an ESP32/LeafLabs board mounted inside the Cardput
 | Servo | Pin 4 | Steering — writes pulse width based on received angle |
 
 **Network Protocol:**
+
 - **Inbound (polling):** Listens on port 5005 for `S,<angle>` steering commands
 - **Outbound (every ~5s):** `B,pct` battery percentage sent via UDP to PC IP:5005
 
 **Servo Timing:**
+
 ```python
 pulse = int(500 + (angle / 180) * 2000)  # 500μs–2500μs range
 # Sends 3 pulses per command with 20ms spacing for reliability
@@ -66,7 +70,8 @@ A standalone Cardputer app that logs accelerometer data to SD card (used when IM
 A Pygame-based control center running on the PC. It connects to the robot via UDP and provides visualization + input handling.
 
 #### Directory Structure
-```
+
+```text
 Client/
 ├── main.py          # Entry point, event loop, widget rendering
 ├── state.py         # Shared mutable state (sensors, battery)
@@ -83,12 +88,14 @@ Client/
 #### Communication Flow
 
 **Receiving Telemetry (network_loop thread):**
+
 1. Binds to UDP port 5005, drains buffer continuously
 2. Parses messages: `B,pct` → update battery state
 
 > **Note:** The client currently receives only battery percentage telemetry. IMU data (`M,ax,ay,az`) sending from the robot is disabled in rcar.py — accelerometer visualization widgets (G-meter, orientation) will show zeros until IMU telemetry is re-enabled.
 
 **Sending Steering Commands:**
+
 - Keyboard input via left/right arrow keys (`STEER_STEP = 2°`)
 - Angle clamped to 0–180 range
 - Only sends when angle changes (optimizes network traffic)
@@ -97,7 +104,7 @@ Client/
 #### Widget Rendering
 
 | Widget | Function |
-|--------|----------|
+| ------ | -------- |
 | GMeter | Red dot moving within circle, scaled by ax/ay normalized to G-force (currently shows zeros — IMU data disabled) |
 | Orientation | Shows roll/pitch angle derived from accelerometer data (currently shows zeros — IMU data disabled) |
 | BatteryText | Displays car battery %, low-battery warning in red (<20%) |
@@ -135,29 +142,32 @@ Client/
 The architecture is designed for future growth — here are the planned extension points:
 
 ### 1. Re-enable IMU Telemetry
+
 - Uncomment accelerometer sending in rcar.py (currently disabled)
 - Client will receive `M,ax,ay,az` packets again
 - G-meter and orientation widgets become functional
 
 ### 2. Video Streaming
+
 - A separate phone streaming video to the computer
 - Client uses another program (like mpv/vlc) to display video
 - Currently planned but not implemented
 
 ### 3. Force Feedback Steering Wheel
+
 - Accelerometer-based force feedback from wheel rotation sensor
 - ESP32 reads encoder/IMU on steering wheel, sends `F,<force>` to PC client
 - Client drives USB force feedback device (e.g., Logitech G29 via HID)
 - Provides realistic resistance during steering
 
 ### 4. Plugin Architecture
+
 - `Client/widgets/` — modular widget system, each feature adds a new widget class
 - `rcar.py` — command parsing can be extended with new message types (`E,<cmd>`, `M2,<motor_data>`)
 - Designed for future sensors (distance sensors, cameras, etc.)
 
-
 ## Known Issues / TODOs
 
 1. **Motor controller not working** — i'm planning to fix this
-4. **WiFi IP hardcoded** as `192.168.1.8` — should be configurable or auto-discovered
-5. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller
+2. **WiFi IP hardcoded** as `192.168.1.8` — should be configurable or auto-discovered
+3. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller

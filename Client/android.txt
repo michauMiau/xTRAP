@@ -1,3 +1,0 @@
-title=RC Control
-author=michauMiau
-orientation=landscape
