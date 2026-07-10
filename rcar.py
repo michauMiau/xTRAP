@@ -83,7 +83,7 @@ DIR_LEFT = Pin(4, Pin.OUT)  # left motor direction
 DIR_RIGHT = Pin(6, Pin.OUT)  # right motor direction
 class Motor:
     def __init__(self):
-        self.speed = PWM(Pin(21))  # PWM speed pin (left side of H-bridge input)
+        self.speed = PWM(DIR_LEFT)  # PWM speed pin (left side of H-bridge input)
         self.speed.freq(50)          # Low freq for H-bridge PWM signal
         self.speed.duty_u16(0)       # Start stopped
 
