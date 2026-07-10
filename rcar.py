@@ -1,12 +1,12 @@
-""" "host.py" file, minify, compile into .mpy for production or something? """
-import socket
-import network
-import gc
-from machine import I2C, Pin, PWM
+""" The car micropthon code, compile into .mpy for production or something? """
 from lib.hydra.config import Config
 from lib.userinput import bmi270
 from lib.battlevel import Battery
-
+from machine import I2C, Pin, PWM
+import socket
+import network
+import time
+import gc
 # This code is NOT ISO 270001 Compliant
 
 batt = Battery()
