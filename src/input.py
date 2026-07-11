@@ -8,6 +8,7 @@ This module provides the high-level functions that buttons call to send commands
 """
 
 import logging
+from kivy.core.window import Window
 from state import state
 import network as net
 
@@ -32,13 +33,34 @@ def release_steer():
 def release_throttle():
     set_throttle(0)
 
-#def setup_joystick(self): # This function doesn't work: NameError: name 'Window' is not defined,  AttributeError: 'RCControlCenterApp' object has no attribute 'on_joy_axis'
-    # Setup bind for joystick events
-#    Window.bind(on_joy_axis=self.on_joy_axis)
-#    def on_joy_axis(self, win, stickid, axisid, value):
-#        print(win, stickid, axisid, value)
-        # TODO: Implement steering and throttle with controller
-        # 2 axis 0 for steering, 7 axis 2 for reverse throttle,  8 axis 5 for throttle
+
+def on_joy_axis(win, stickid, axisid, value):
+    """Handle gamepad joystick events.
+    
+    Args:
+        win: The window object
+        stickid: Which controller (usually 0 for first pad)
+        axisid: Which axis changed (2=left x-stick, 5=right y-stick)
+        value: Position from -1.0 to 1.0
+    """
+    # Map joystick axes to controls:
+    # Axis 2 (left stick horizontal): Steering (-1.0 = full left, 1.0 = full right)
+    # Axis 5 (right stick vertical): Throttle (-1.0 = reverse, 1.0 = forward)
+    
+    if axisid == 2:
+        # Map -1..1 to 45..135 degrees for steering
+        angle = int(90 + value * 45)
+        set_steer(angle=angle)
+    elif axisid == 5:
+        # Map -1..1 to -100..100 throttle
+        level = int(value * 100)
+        set_throttle(level)
+
+
+def setup_joystick():
+    """Setup joystick event binding for gamepad input."""
+    Window.bind(on_joy_axis=on_joy_axis)
+
 
 def setup_button_bindings(steering_panel, throttle_panel):
     """Bind input handlers to UI buttons.
