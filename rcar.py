@@ -168,7 +168,6 @@ while True:
 #    sock.sendto(msg.encode(), (HOST_IP, PORT))
 
 # --- RECEIVE CONTROL ---
-    got_command = False
     try:
         data, addr = sock.recvfrom(64)
         msg = data.decode().strip()
@@ -183,13 +182,12 @@ while True:
             throttle = int(parts[1])
             motor.run(throttle)
             last_throttle_time = now
-            got_command = True
             print("T" + str(throttle))
     except Exception:
         pass
 
     # Auto-coast if no throttle command received within timeout
-    if got_command or time.ticks_diff(now, last_throttle_time) < COAST_TIMEOUT_MS:
+    if time.ticks_diff(now, last_throttle_time) < COAST_TIMEOUT_MS:
         pass  # Keep current state
     else:
         motor.run(0)  # Coast — kill everything
