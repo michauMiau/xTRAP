@@ -4,7 +4,7 @@ import os
 import sys
 
 os.environ["KIVY_GL_BACKEND"] = "gl"
-        
+
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.clock import Clock
@@ -16,35 +16,65 @@ from kivy.uix.label import Label
 import threading
 from state import state
 import network as net
+from discovery import (
+    get_local_ip, start_broadcasting, start_discovery_listener, probe_device
+)
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 from input import setup_button_bindings
 
 
+def _discover_and_connect():
+    """Background: try auto-discover, fall back to probing default IP."""
+    discovered = []
+
+    def on_found(ip, port):
+        discovered.append((ip, port))
+
+    start_broadcasting()
+    start_discovery_listener(on_found)
+
+    # Wait up to 6s for multicast responses
+    import time
+    time.sleep(3.0)
+
+    if discovered:
+        ip, port = discovered[0]
+        net.set_car_addr((ip, port))
+        print(f"[discovery] Found device at {ip}:{port}")
+        return
+
+    # Fallback: probe default address
+    ip, port = probe_device("192.168.1.225")
+    if ip:
+        net.set_car_addr((ip, port))
+        print(f"[discovery] Probed device at {ip}:{port}")
+
+
 class StatusPanel(BoxLayout):
     """Status bar — battery + G-meter (horizontal layout)"""
-    
+
     def __init__(self):
         super().__init__()
-        
+
         self.orientation = "horizontal"
         self.size_hint_y = None
         self.height = 30
-        
+
         # Battery display
         self.battery = Battery()  # Use the Kivy Battery widget
-        
+
         # G-meter text (from original main.py — keeps the G calculation logic from state)
         self.g_label = Label(
-            text=f"G: {state.g:.2f} MAX: {state.max_g:.2f}", 
-            font_size=18, 
-            size_hint=(0.7, None), 
+            text=f"G: {state.g:.2f} MAX: {state.max_g:.2f}",
+            font_size=18,
+            size_hint=(0.7, None),
             height=30
         )
-        
+
         # Spacer between battery and G-meter
         spacer = Label(size_hint=(0.15, None), height=30)
-        
+
         self.add_widget(self.battery)
         self.add_widget(spacer)
         self.add_widget(self.g_label)
@@ -52,40 +82,40 @@ class StatusPanel(BoxLayout):
 
 class SteeringPanel(BoxLayout):
     """Kivy version of the steering input — uses buttons"""
-    
+
     def __init__(self):
         super().__init__()
-        
+
         # Horizontal layout: [left_btn] [center_btn] [steer_display] [right_btn]
         self.orientation = "horizontal"
         self.size_hint_y = None
         self.height = 60
-        
+
         # Left/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.left_btn = KButton(
             text="<", font_size=32, size_hint_x=None, width=45,
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
-        
+
         # Center steering button — returns steering to 90°
         self.center_btn = KButton(
             text="|", font_size=32, size_hint_x=None, width=45,
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
-        
+
         # Right/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.right_btn = KButton(
             text=">", font_size=32, size_hint_x=None, width=45,
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
-        
+
         # Steering display — centered between buttons
         self.steer_display = Label(
-            text=f"Steering: {state.steer}°", 
-            font_size=24, 
+            text=f"Steering: {state.steer}°",
+            font_size=24,
             size_hint_x=5, width=100
         )
-        
+
         self.add_widget(self.left_btn)
         self.add_widget(self.center_btn)
         self.add_widget(self.steer_display)
@@ -94,34 +124,34 @@ class SteeringPanel(BoxLayout):
 
 class ThrottlePanel(BoxLayout):
     """Kivy version of the throttle input — uses buttons"""
-    
+
     def __init__(self):
         super().__init__()
-        
+
         # Horizontal layout: [reverse_btn] [throttle_display] [forward_btn]
         self.orientation = "horizontal"
         self.size_hint_y = None
         self.height = 60
-        
+
         # Reverse/Brake button (left) - ASCII arrow <
         self.reverse_btn = KButton(
             text="<", font_size=48, size_hint_x=None, width=60,
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
-        
-        # Throttle display  
+
+        # Throttle display
         self.throttle_display = Label(
-            text=f"Throttle: {state.throttle}%", 
-            font_size=24, 
+            text=f"Throttle: {state.throttle}%",
+            font_size=24,
             size_hint_x=5, width=100
         )
-        
+
         # Forward/Throttle button (right) - ASCII arrow >
         self.forward_btn = KButton(
             text=">", font_size=48, size_hint_x=None, width=60,
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
-        
+
         self.add_widget(self.reverse_btn)
         self.add_widget(self.throttle_display)
         self.add_widget(self.forward_btn)
@@ -129,29 +159,29 @@ class ThrottlePanel(BoxLayout):
 
 class MainLayout(GridLayout):
     """Main app layout — grid-based, no overlapping elements"""
-    
+
     def __init__(self):
         super().__init__()
-        
+
         # 3 rows: status bar (top), controls (middle), UI panel (bottom)
         self.rows = 3
-        
+
         # Status bar at top (battery + G reading) — horizontal layout on top of everything
         self.status_panel = StatusPanel()
         self.add_widget(self.status_panel)
-        
+
         # Steering and throttle panels side by side in middle row
         control_row = GridLayout()
         control_row.cols = 2  # steering left, throttle right
-        
+
         self.steering_panel = SteeringPanel()
         control_row.add_widget(self.steering_panel)
-        
+
         self.throttle_panel = ThrottlePanel()
         control_row.add_widget(self.throttle_panel)
-        
+
         self.add_widget(control_row)
-        
+
         # IP display at bottom (placeholder — will add real IP management later)
         self.ui_panel = PanelUI()
         self.add_widget(self.ui_panel)
@@ -159,10 +189,10 @@ class MainLayout(GridLayout):
 
 
 class RCControlCenterApp(App):
-    """Main Kivy application — cross-platform RC control center""" 
+    """Main Kivy application — cross-platform RC control center"""
     def __init__(self):
         super().__init__()
-        
+
         # Setup window for mobile/PC use — same size as pygame version (800x200)
         Window.size = (800, 200)
 
@@ -172,36 +202,40 @@ class RCControlCenterApp(App):
 
     def on_start(self):
         """Start the network receive loop when app starts.
-        
+
         self.root is already set by Kivy at this point, so we can safely access it.
         """
         # Set up button bindings — self.root is now available via Kivy's init
         setup_button_bindings(self.root.steering_panel, self.root.throttle_panel)
-        
+
 
         # Start UI update loop (called every frame by Clock.schedule_interval)
         Clock.schedule_interval(self.update_ui, 1/40)  # ~40fps
-        
+
         net.network_loop()
+
+        # Auto-discover device in background thread
+        threading.Thread(target=_discover_and_connect, daemon=True).start()
+
 
     def update_ui(self, dt):
         """Update UI elements with current state — called every frame by Clock.schedule_interval"""
         # Update steering display
         self.root.steering_panel.steer_display.text = f"Steering: {state.steer}°"
-        
+
         # Update throttle display
         self.root.throttle_panel.throttle_display.text = f"Throttle: {state.throttle}%"
-        
+
         # Update battery display — red below 20%, white otherwise (same as pygame version)
         car_pct = state.batt_pct
         if car_pct < 20:
             self.root.status_panel.battery.color = (1, 0, 0)  # Red
         else:
             self.root.status_panel.battery.color = (1, 1, 1)  # White
-        
+
         self.root.status_panel.battery.text = f"Car: {car_pct:.0f}%"
-        
-        # Update G-meter display  
+
+        # Update G-meter display
         self.root.status_panel.g_label.text = f"G: {state.g:.2f} MAX: {state.max_g:.2f}"
 
 if __name__ == "__main__":
