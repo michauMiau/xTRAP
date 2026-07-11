@@ -1,9 +1,4 @@
-"""Kivy version of BatteryText widget — replaces pygame font rendering with Kivy Label
-
-Original (pygame):
-- Uses pygame.font.SysFont() to render text
-- Draws onto pygame surface via blit
-- Color changes based on battery percentage (red below 20%, white otherwise)
+"""Kivy version of BatteryText widget
 
 In Kivy:
 - Uses kivy.uix.label.Label for text display
@@ -16,8 +11,6 @@ from kivy.uix.label import Label
 
 class Battery(Label):
     """Kivy battery widget — shows car battery percentage
-
-    Replaces pygame's BatteryText which used font rendering and surface blitting.
     This Kivy version uses a simple Label with dynamic text/color updates.
 
     Args:

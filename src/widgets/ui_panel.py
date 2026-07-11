@@ -1,9 +1,4 @@
-"""UI Panel for Kivy — IP management widget (replaces pygame custom widgets)
-
-Original (pygame) had:
-1. Button class → Custom rect drawing + mouse event handling
-2. Slider class → Custom rectangle + circle knob dragging
-3. TextBox class → Custom text input with cursor animation
+"""UI Panel for Kivy — IP management widget
 
 In Kivy:
 - Use kivy.uix.button.Button for buttons
@@ -24,15 +19,7 @@ from kivy.uix.label import Label as KLabel
 
 
 class PanelUI(BoxLayout):
-    """Simplified UIPanel for IP management (replaces pygame's UIPanel)
-
-    Original pygame UIPanel had:
-    - 4 buttons (Flash, Front, Back, Focus) — camera controls, not needed
-    - 2 sliders (Zoom, Quality) — camera controls, not needed
-    - 2 text inputs (Car IP, Phone IP) — only Car IP is relevant
-
-    Kivy version keeps only the essential: Car IP input + connect button.
-    """
+    """ Simplified UIPanel for IP management """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -50,13 +37,13 @@ class PanelUI(BoxLayout):
             text="Phone IP", font_size=14, size_hint_x=None, width=80
         )
 
-        # Car IP input (TextInput — Kivy handles focus/IME natively)
+        # Car IP input 
         self.car_ip_input = KTextInput(
             text="192.168.1.225", multiline=False, size_hint_x=None, width=150,
             font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
 
-        # Phone IP input (placeholder — not needed for RC control)
+        # Phone IP input (placeholder, will be implemented later)
         self.phone_ip_input = KTextInput(
             text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
             font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
@@ -64,12 +51,12 @@ class PanelUI(BoxLayout):
 
         # Status label for connection feedback
         self.status_label = KLabel(
-            text="", font_size=12, size_hint_x=None, width=80
+            text="", font_size=12, size_hint_x=5, width=80
         )
 
-        # Connect button (replaces pygame's TextBox ENTER key handling)
+        # Connect button
         self.connect_btn = KButton(
-            text="CONNECT", font_size=14, size_hint_x=None, width=80,
+            text="Save", font_size=14, size_hint_x=None, width=80,
             background_color=(0.29, 0.76, 0.31, 1), color=(1, 1, 1, 1)
         )
 
@@ -104,7 +91,7 @@ class PanelUI(BoxLayout):
             addr_tuple = (ip, 5005)
         
         net.set_car_addr(addr_tuple)
-        self._show_status(f"CONNECTED TO {addr_tuple[0]}", (0.3, 1, 0.3, 1))
+        self._show_status(f"Set!", (0.3, 1, 0.3, 1))
 
     def _show_status(self, text, color):
         """Update status label with text and color"""
@@ -113,15 +100,7 @@ class PanelUI(BoxLayout):
 
 
 class ZoomSlider(BoxLayout):
-    """Zoom slider — Kivy Slider (replaces pygame custom Slider class)
-
-    Original pygame version had a manual implementation with:
-    - Custom rect drawing
-    - Circle knob rendering
-    - Mouse drag event handling
-
-    Kivy version uses built-in Slider widget.
-    """
+    """Zoom slider — For the IP camera streaming """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -141,7 +120,7 @@ class ZoomSlider(BoxLayout):
 
 
 class QualitySlider(BoxLayout):
-    """Quality slider — Kivy Slider (replaces pygame custom Slider class)"""
+    """Quality slider — for ip camera streaming"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
