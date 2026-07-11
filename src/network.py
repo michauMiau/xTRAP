@@ -9,7 +9,7 @@ from state import state
 log = logging.getLogger(__name__)
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-_car_addr_list = ["192.168.1.225", 5005]  # mutable list for thread-safe updates
+_car_addr_list = ["192.168.1.226", 5005]  # mutable list for thread-safe updates
 _car_addr_lock = threading.Lock()
 
 PORT_RECV = 5005

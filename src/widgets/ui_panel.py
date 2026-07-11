@@ -39,13 +39,13 @@ class PanelUI(BoxLayout):
 
         # Car IP input 
         self.car_ip_input = KTextInput(
-            text="192.168.1.225", multiline=False, size_hint_x=None, width=150,
+            text="192.168.1.226", multiline=False, size_hint_x=None, width=150,
             font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
 
         # Phone IP input (placeholder, will be implemented later)
         self.phone_ip_input = KTextInput(
-            text="192.168.1.174", multiline=False, size_hint_x=None, width=150,
+            text="", multiline=False, size_hint_x=None, width=150,
             font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
 

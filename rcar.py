@@ -18,7 +18,7 @@ config = Config()
 nic.config(pm=0) # Tried to disable power managment on the wifi chip
 
 # --- UDP ---
-HOST_IP = "192.168.1.234"  # TODO: maybe implement some kind of system to automatically get computer ip?
+HOST_IP = "192.168.1.235"  # TODO: maybe implement some kind of system to automatically get computer ip?
 PORT = 5005
 
 def connect_wifi():
