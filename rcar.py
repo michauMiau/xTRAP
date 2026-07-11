@@ -86,17 +86,53 @@ class Motor:
         self.speed = PWM(DIR_LEFT)  # PWM speed pin (left side of H-bridge input)
         self.speed.freq(50)          # Low freq for H-bridge PWM signal
         self.speed.duty_u16(0)       # Start stopped
+        self._last_dir = None
 
     def run(self, speed):
-        """Set motor speed — speed is -100 (full reverse) to 100 (full forward)."""
+        """Set motor speed — speed is -100 (full reverse) to 100 (full forward).
+        
+        Adds dead-time between direction changes to prevent H-bridge shoot-through.
+        MX1508 needs both outputs off briefly when switching direction.
+        """
         if speed < 0:
-            DIR_LEFT.value(True); DIR_RIGHT.value(False)
-            self.speed.duty_u16(int(-speed * 327.68))  # 0..65535 from abs(speed)
+            new_dir = "REV"
         elif speed > 0:
-            DIR_LEFT.value(False); DIR_RIGHT.value(True)
-            self.speed.duty_u16(int(speed * 327.68))
+            new_dir = "FWD"
         else:
+            # Coast — kill everything first, then set dir if needed next time
             self.speed.duty_u16(0)
+            DIR_LEFT.value(False)
+            DIR_RIGHT.value(False)
+            self._last_dir = None
+            return
+        
+        # Dead-time: turn off PWM before switching direction pins
+        was_rev = (self._last_dir == "REV")
+        is_now_rev = (new_dir == "REV")
+        
+        if was_rev != is_now_rev or speed > 0 and self._last_dir is None:
+            # Need to switch direction — turn off PWM first for dead time
+            self.speed.duty_u16(0)
+            time.sleep_us(500)  # ~500µs dead time
+            
+            DIR_LEFT.value(False)
+            DIR_RIGHT.value(False)
+            
+            if new_dir == "REV":
+                DIR_LEFT.value(True)
+                DIR_RIGHT.value(False)
+            else:
+                DIR_LEFT.value(False)
+                DIR_RIGHT.value(True)
+        
+        self._last_dir = new_dir
+        
+        # Now set PWM speed (safe — direction is already stable)
+        abs_speed = abs(speed)
+        if abs_speed > 100:
+            abs_speed = 100
+        self.speed.duty_u16(int(abs_speed * 327.68))
+
 motor = Motor()
 
 # Setup connections
