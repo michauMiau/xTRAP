@@ -37,7 +37,7 @@ class Battery(Label):
         self.size_hint_y = None
         self.height = 25
         self.background_color = (0.2, 0.2, 0.2)
-        self.color = (1, 1, 1)  # White by default
+        self.color = (1, 1, 1, 1)  # White by default — RGBA format
 
     def update(self):
         """Update display based on current battery state"""
@@ -46,8 +46,8 @@ class Battery(Label):
 
             # Color changes below 20% (same as pygame version)
             if car_pct < 20:
-                self.color = (1, 0, 0)  # Red
+                self.color = (1, 0, 0, 1)  # Red — RGBA format
             else:
-                self.color = (1, 1, 1)  # White
+                self.color = (1, 1, 1, 1)  # White — RGBA format
 
             self.text = f"Car: {car_pct:.0f}%"

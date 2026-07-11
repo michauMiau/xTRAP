@@ -40,14 +40,14 @@ def _discover_and_connect():
 
     if discovered:
         ip, port = discovered[0]
-        net.CAR_ADDR = (ip, port)
+        net.set_car_addr((ip, port))
         print(f"[discovery] Found device at {ip}:{port}")
         return
 
     # Fallback: probe default address
     ip, port = probe_device("192.168.1.225")
     if ip:
-        net.CAR_ADDR = (ip, port)
+        net.set_car_addr((ip, port))
         print(f"[discovery] Probed device at {ip}:{port}")
 
 

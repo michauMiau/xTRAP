@@ -104,8 +104,6 @@ class PanelUI(BoxLayout):
 
     def _connect(self, *args):
         """Handle connect/disconnect button press — probes address via UDP"""
-        import network
-
         ip = self.car_ip_input.text.strip()
         if not ip:
             self._show_status("NO IP", (1, 0.3, 0.3, 1))
@@ -118,7 +116,8 @@ class PanelUI(BoxLayout):
             return
 
         ip_addr, port = result
-        network.CAR_ADDR = (ip_addr, port)
+        import network as net
+        net.set_car_addr((ip_addr, port))
 
         # Probe in background thread — don't block UI
         self.status_label.text = "CHECKING..."
