@@ -134,7 +134,6 @@ class Motor:
         self.speed.duty_u16(int(abs_speed * 327.68))
 
 motor = Motor()
-last_throttle_time = time.ticks_ms()
 
 # Setup connections
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -154,8 +153,6 @@ def gc_collect():
     if time.ticks_diff(now, gc_collect_at) > 30000:
         gc.collect()
         gc_collect_at = now
-
-COAST_TIMEOUT_MS = 500  # Auto-coast after 500ms without throttle command (WiFi UDP latency tolerance)
 
 
 while True:
@@ -178,19 +175,13 @@ while True:
             angle = int(parts[1])
             servo.set_angle(angle)
 
+        # T command: set throttle once, hold state until next T packet (T0 stops motor)
         if parts[0] == "T" and len(parts) > 1:
             throttle = int(parts[1])
             motor.run(throttle)
-            last_throttle_time = now
             print("T" + str(throttle))
     except Exception:
         pass
-
-    # Auto-coast if no throttle command received within timeout
-    if time.ticks_diff(now, last_throttle_time) < COAST_TIMEOUT_MS:
-        pass  # Keep current state
-    else:
-        motor.run(0)  # Coast — kill everything
 
     # --- SLOW ---
     if time.ticks_diff(now, last_stats_time) > 5000: # Lowered the time to 5s
