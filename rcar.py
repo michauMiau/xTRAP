@@ -155,7 +155,7 @@ def gc_collect():
         gc.collect()
         gc_collect_at = now
 
-COAST_TIMEOUT_MS = 100  # Auto-coast after 100ms without throttle command
+COAST_TIMEOUT_MS = 2000  # Auto-coast after 2s without throttle command (WiFi UDP latency)
 
 
 while True:
