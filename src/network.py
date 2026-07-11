@@ -1,10 +1,10 @@
 # network.py — centralized networking for RC control
 import socket
 import math
+import time
 import logging
 import threading
 from state import state
-from discovery import DISCOVERY_PORT, probe_device
 
 log = logging.getLogger(__name__)
 
@@ -41,13 +41,11 @@ def network_loop():
             sock.settimeout(0.1)  # Non-blocking with timeout for CPU safety
 
             latest = None
-            last_msg_time = time.time() if 'time' in dir(__import__('time')) else 0
 
             while True:
                 try:
                     data, _ = sock.recvfrom(1024)
                     latest = data
-                    last_msg_time = __import__('time').time()
                 except socket.timeout:
                     pass  # Timeout is normal with settimeout — keep draining
                 except Exception as e:
@@ -84,7 +82,7 @@ def network_loop():
             except Exception:
                 pass
 
-    import threading as _threading
+    _threading = threading
     _threading.Thread(target=recv_loop, daemon=True).start()
 
 
@@ -106,5 +104,3 @@ def send_throttle(throttle):
         send_sock.sendto(msg.encode(), addr)
     except Exception as e:
         log.error(f"[network] send_throttle failed: {e}")
-
-import time  # needed for recv_loop timeout tracking

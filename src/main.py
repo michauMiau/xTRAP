@@ -13,42 +13,11 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.label import Label
 
-import threading
 from state import state
 import network as net
-from discovery import (
-    get_local_ip, start_broadcasting, start_discovery_listener, probe_device
-)
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
-from input import setup_button_bindings
-
-
-def _discover_and_connect():
-    """Background: try auto-discover, fall back to probing default IP."""
-    discovered = []
-
-    def on_found(ip, port):
-        discovered.append((ip, port))
-
-    start_broadcasting()
-    start_discovery_listener(on_found)
-
-    # Wait up to 6s for multicast responses
-    import time
-    time.sleep(3.0)
-
-    if discovered:
-        ip, port = discovered[0]
-        net.set_car_addr((ip, port))
-        print(f"[discovery] Found device at {ip}:{port}")
-        return
-
-    # Fallback: probe default address
-    ip, port = probe_device("192.168.1.225")
-    if ip:
-        net.set_car_addr((ip, port))
-        print(f"[discovery] Probed device at {ip}:{port}")
+from input import setup_button_bindings, setup_joystick
 
 
 class StatusPanel(BoxLayout):
@@ -214,8 +183,8 @@ class RCControlCenterApp(App):
 
         net.network_loop()
 
-        # Auto-discover device in background thread
-        threading.Thread(target=_discover_and_connect, daemon=True).start()
+        # Setup joystick/gamepad support
+        setup_joystick()
 
 
     def update_ui(self, dt):
