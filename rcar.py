@@ -77,61 +77,42 @@ class Servo:
             time.sleep_ms(20)
 servo = Servo(3)  # your servo pin
 
-# --- MOTOR (H-Bridge PWM) ---
-# H-bridge direction pins — one per side of the tracked robot
-DIR_LEFT = Pin(4, Pin.OUT)  # left motor direction
-DIR_RIGHT = Pin(6, Pin.OUT)  # right motor direction
+# --- MOTOR (MX1508 Dual PWM) ---
 class Motor:
     def __init__(self):
-        self.speed = PWM(DIR_LEFT)  # PWM speed pin (left side of H-bridge input)
-        self.speed.freq(20000)       # 20kHz for MX1508 — full motor power
-        self.speed.duty_u16(0)       # Start stopped
-        self._last_dir = None
+        self.pwm_fwd = PWM(Pin(4))   # IN1 — forward
+        self.pwm_rev = PWM(Pin(6))   # IN2 — reverse
+        self.pwm_fwd.freq(20000)     # 20kHz for smooth motor control
+        self.pwm_rev.freq(20000)
+
+    def stop(self):
+        """Stop motor completely"""
+        self.pwm_fwd.duty_u16(0)
+        self.pwm_rev.duty_u16(0)
 
     def run(self, speed):
         """Set motor speed — speed is -100 (full reverse) to 100 (full forward).
         
-        Adds dead-time between direction changes to prevent H-bridge shoot-through.
-        MX1508 needs both outputs off briefly when switching direction.
+        MX1508 dual PWM control:
+        - Forward: IN1=ON, IN2=OFF
+        - Reverse: IN1=OFF, IN2=ON  
+        - Stop: both OFF
         """
-        if speed < 0:
-            new_dir = "REV"
-        elif speed > 0:
-            new_dir = "FWD"
-        else:
-            # Coast — kill everything first, then set dir if needed next time
-            self.speed.duty_u16(0)
-            DIR_LEFT.value(False)
-            DIR_RIGHT.value(False)
-            self._last_dir = None
+        if speed == 0:
+            self.stop()
             return
         
-        # Dead-time: turn off PWM before switching direction pins
-        was_rev = (self._last_dir == "REV")
-        is_now_rev = (new_dir == "REV")
+        # Normalize speed to 0-100 range
+        abs_speed = min(abs(speed), 100)
         
-        if (was_rev != is_now_rev) or (speed > 0 and self._last_dir is None):
-            # Need to switch direction — turn off PWM first for dead time
-            self.speed.duty_u16(0)
-            time.sleep_us(500)  # ~500µs dead time
-            
-            DIR_LEFT.value(False)
-            DIR_RIGHT.value(False)
-            
-            if new_dir == "REV":
-                DIR_LEFT.value(True)
-                DIR_RIGHT.value(False)
-            else:
-                DIR_LEFT.value(False)
-                DIR_RIGHT.value(True)
-        
-        self._last_dir = new_dir
-        
-        # Now set PWM speed (safe — direction is already stable)
-        abs_speed = abs(speed)
-        if abs_speed > 100:
-            abs_speed = 100
-        self.speed.duty_u16(int(abs_speed * 327.68))
+        if speed > 0:
+            # Forward — IN1 ON, IN2 OFF
+            self.pwm_fwd.duty_u16(int(abs_speed * 327.68))  # 0-100% → 0-32768 (16-bit)
+            self.pwm_rev.duty_u16(0)
+        else:
+            # Reverse — IN1 OFF, IN2 ON
+            self.pwm_fwd.duty_u16(0)
+            self.pwm_rev.duty_u16(int(abs_speed * 327.68))
 
 motor = Motor()
 
