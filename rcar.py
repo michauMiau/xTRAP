@@ -110,7 +110,7 @@ class Motor:
         was_rev = (self._last_dir == "REV")
         is_now_rev = (new_dir == "REV")
         
-        if was_rev != is_now_rev or speed > 0 and self._last_dir is None:
+        if (was_rev != is_now_rev) or (speed > 0 and self._last_dir is None):
             # Need to switch direction — turn off PWM first for dead time
             self.speed.duty_u16(0)
             time.sleep_us(500)  # ~500µs dead time
@@ -155,7 +155,7 @@ def gc_collect():
         gc.collect()
         gc_collect_at = now
 
-COAST_TIMEOUT_MS = 2000  # Auto-coast after 2s without throttle command (WiFi UDP latency)
+COAST_TIMEOUT_MS = 500  # Auto-coast after 500ms without throttle command (WiFi UDP latency tolerance)
 
 
 while True:
