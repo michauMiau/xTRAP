@@ -84,7 +84,7 @@ DIR_RIGHT = Pin(6, Pin.OUT)  # right motor direction
 class Motor:
     def __init__(self):
         self.speed = PWM(DIR_LEFT)  # PWM speed pin (left side of H-bridge input)
-        self.speed.freq(50)          # Low freq for H-bridge PWM signal
+        self.speed.freq(20000)       # 20kHz for MX1508 — full motor power
         self.speed.duty_u16(0)       # Start stopped
         self._last_dir = None
 
