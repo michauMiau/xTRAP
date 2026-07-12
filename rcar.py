@@ -80,10 +80,11 @@ servo = Servo(3)  # your servo pin
 # --- MOTOR (MX1508 Dual PWM) ---
 class Motor:
     def __init__(self):
-        self.pwm_fwd = PWM(Pin(4))   # IN1 — forward
-        self.pwm_rev = PWM(Pin(6))   # IN2 — reverse
-        self.pwm_fwd.freq(20000)     # 20kHz for smooth motor control
-        self.pwm_rev.freq(20000)
+        # MX1508 needs two independent PWM pins for full power control
+        self.pwm_fwd = PWM(Pin(4))   # IN1 — forward direction
+        self.pwm_rev = PWM(Pin(6))   # IN2 — reverse direction
+        self.pwm_fwd.freq(500)       # 500Hz — smooth for motor, no skakanie
+        self.pwm_rev.freq(500)
 
     def stop(self):
         """Stop motor completely"""
@@ -93,26 +94,25 @@ class Motor:
     def run(self, speed):
         """Set motor speed — speed is -100 (full reverse) to 100 (full forward).
         
-        MX1508 dual PWM control:
-        - Forward: IN1=ON, IN2=OFF
-        - Reverse: IN1=OFF, IN2=ON  
-        - Stop: both OFF
+        MX1508 dual PWM: IN1 for forward, IN2 for reverse.
+        At T100/T-100 both active pins get full duty (65535), inactive gets 0.
         """
         if speed == 0:
             self.stop()
             return
         
-        # Normalize speed to 0-100 range
         abs_speed = min(abs(speed), 100)
+        # Scale to 16-bit PWM range (max ~65535, use ~65500 to be safe)
+        duty = int(abs_speed * 655.0)
         
         if speed > 0:
-            # Forward — IN1 ON, IN2 OFF
-            self.pwm_fwd.duty_u16(int(abs_speed * 327.68))  # 0-100% → 0-32768 (16-bit)
-            self.pwm_rev.duty_u16(0)
+            # Forward — IN1=full, IN2=off
+            self.pwm_fwd.duty_u16(duty)    # IN1 gets speed PWM
+            self.pwm_rev.duty_u16(0)       # IN2 off
         else:
-            # Reverse — IN1 OFF, IN2 ON
-            self.pwm_fwd.duty_u16(0)
-            self.pwm_rev.duty_u16(int(abs_speed * 327.68))
+            # Reverse — IN1=off, IN2=full
+            self.pwm_fwd.duty_u16(0)       # IN1 off
+            self.pwm_rev.duty_u16(duty)    # IN2 gets speed PWM
 
 motor = Motor()
 
