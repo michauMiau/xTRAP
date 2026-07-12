@@ -17,7 +17,7 @@ from state import state
 import network as net
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
-from input import setup_button_bindings, setup_joystick
+from input import setup_button_bindings, setup_joystick, release_throttle
 
 
 class StatusPanel(BoxLayout):
@@ -185,6 +185,11 @@ class RCControlCenterApp(App):
 
         # Setup joystick/gamepad support
         setup_joystick()
+
+
+    def on_stop(self):
+        """Clean up when app exits — reset throttle to zero."""
+        release_throttle()
 
 
     def update_ui(self, dt):

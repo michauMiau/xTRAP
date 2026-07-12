@@ -34,32 +34,20 @@ def set_throttle(level):
 def release_steer():
     set_steer(center_steer)
 
+
 def release_throttle():
     set_throttle(0)
 
 
-# --- Throttle step control for granular forward/reverse ---
-_THROTTLE_STEP = 25  # Steps of 25% when holding buttons
-
-def _forward_throttle_step():
-    """Forward button: increment throttle by STEP (0 → 25 → 50 → 75 → 100)."""
-    current = state.throttle
-    if current < 0:
-        set_throttle(0)  # Reset to neutral first
-    else:
-        new_level = min(current + _THROTTLE_STEP, 100)
-        set_throttle(new_level)
+# --- Throttle buttons: instant full power on press, zero on release ---
+def _forward_full_throttle():
+    """Forward button: instant 100% throttle."""
+    set_throttle(100)
 
 
-def _reverse_throttle_step():
-    """Reverse button: decrement throttle by STEP (0 → -25 → -50 → -75 → -100)."""
-    current = state.throttle
-    if current > 0:
-        set_throttle(0)  # Reset to neutral first
-    else:
-        new_level = max(current - _THROTTLE_STEP, -100)
-        set_throttle(new_level)
-
+def _reverse_full_throttle():
+    """Reverse button: instant -100% throttle."""
+    set_throttle(-100)
 
 def on_joy_axis(win, stickid, axisid, value):
     """Handle gamepad joystick events.
@@ -70,28 +58,39 @@ def on_joy_axis(win, stickid, axisid, value):
         axisid: Which axis changed (2=left x-stick, 5=right y-stick)
         value: Position from -1.0 to 1.0 OR raw gamepad values (0..65535)
     """
+    # Deadzone threshold — ignore small drift near center
+    DEADZONE = 0.1
+    
     # Normalize value if it's in raw range (gamepads sometimes send 0..65535 or negative raw)
     if abs(value) > 2.0:
-        # Raw gamepad scale (e.g., -32768..32767 or 0..65535) → normalize to -1..1
         if value > 0:
-            value = float(value / 32767.0)  # Assume signed 16-bit
+            value = float(value / 32767.0)
         else:
-            value = float(value / 32768.0)  # Assume signed 16-bit
+            value = float(value / 32768.0)
     
     # Clamp to safe range just in case
     value = max(-1.0, min(1.0, value))
     
-    # Map joystick axes to controls:
+    # Apply deadzone — values within ±DEADZONE become 0
+    if abs(value) < DEADZONE:
+        value = 0.0
+    
+    # Map joystick axes to controls using configurable steering variables
     # Axis 2 (left stick horizontal): Steering (-1.0 = full left, 1.0 = full right)
     # Axis 5 (right stick vertical): Throttle (-1.0 = reverse, 1.0 = forward)
     
     if axisid == 2:
-        # Map -1..1 to 45..135 degrees for steering
-        angle = int(90 + value * 45)
+        # Map -1..0 to left_steer..center_steer, and 0..1 to center_steer..right_steer
+        if value < 0:
+            # Left half: left_steer (45) → center_steer (90) when going -1.0 → 0.0
+            angle = int(left_steer + abs(value) * (center_steer - left_steer))
+        else:
+            # Right half: center_steer (90) → right_steer (135) when going 0.0 → 1.0
+            angle = int(center_steer + value * (right_steer - center_steer))
         set_steer(angle=angle)
     elif axisid == 5:
-        # Map -1..1 to -100..100 throttle with smooth granularity
-        level = int(value * 100)
+        # Throttle with smooth granularity, max 99% on full trigger pull
+        level = int(value * 99) if value > 0 else int(value * 100)
         set_throttle(level)
 
 
@@ -125,14 +124,13 @@ def setup_button_bindings(steering_panel, throttle_panel):
         on_release=lambda *a: release_steer(),
     )
 
-    # Wire throttle buttons -- granular forward/reverse with step control
-    # Forward: 0 → 25 → 50 → 75 → 100 (single press = +25 steps, hold for max)
+    # Wire throttle buttons -- instant full power on press, zero on release
     throttle_panel.forward_btn.bind(
-        on_press=lambda *a: _forward_throttle_step(),
+        on_press=lambda *a: _forward_full_throttle(),
         on_release=lambda *a: release_throttle(),
     )
-    # Reverse: 0 → -25 → -50 → -75 → -100 (single press = -25 steps, hold for max)
+    # Reverse: instant -100% on press, zero on release
     throttle_panel.reverse_btn.bind(
-        on_press=lambda *a: _reverse_throttle_step(),
+        on_press=lambda *a: _reverse_full_throttle(),
         on_release=lambda *a: release_throttle(),
     )
