@@ -14,6 +14,10 @@ import network as net
 
 log = logging.getLogger(__name__)
 
+# Define changable steering positions
+left_steer = 45 # Utmost left steer position
+center_steer = 90 # Default neutral steering position
+right_steer = 135 # Utmost right steering position
 
 def set_steer(*a, angle: float = 90):
     """Set steering to a given angle and send command via network."""
@@ -28,7 +32,7 @@ def set_throttle(level):
     net.send_throttle(int(level))
 
 def release_steer():
-    set_steer(90)
+    set_steer(center_steer)
 
 def release_throttle():
     set_throttle(0)
@@ -76,14 +80,14 @@ def setup_button_bindings(steering_panel, throttle_panel):
 
     # Wire steering buttons (adjustable) -- release returns to center
     steering_panel.left_btn.bind(
-        on_press=lambda *a: set_steer(angle=45),
+        on_press=lambda *a: set_steer(angle=left_steer),
         on_release=lambda *a: release_steer(),
     )
 
-    steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=90))
+    steering_panel.center_btn.bind(on_press=lambda *a: set_steer(angle=center_steer))
 
     steering_panel.right_btn.bind(
-        on_press=lambda *a: set_steer(angle=135),
+        on_press=lambda *a: set_steer(angle=right_steer),
         on_release=lambda *a: release_steer(),
     )
 
