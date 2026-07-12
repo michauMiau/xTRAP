@@ -75,14 +75,14 @@ class Servo:
         for _ in range(3):
             self.write_pulse(pulse)
             time.sleep_ms(20)
-servo = Servo(3)  # your servo pin
+servo = Servo(2)  # your servo pin
 
 # --- MOTOR (MX1508 Dual PWM) ---
 class Motor:
     def __init__(self):
         # MX1508 needs two independent PWM pins for full power control
-        self.pwm_fwd = PWM(Pin(4))   # IN1 — forward direction
-        self.pwm_rev = PWM(Pin(6))   # IN2 — reverse direction
+        self.pwm_fwd = PWM(Pin(6))   # IN1 — forward direction
+        self.pwm_rev = PWM(Pin(4))   # IN2 — reverse direction
         self.pwm_fwd.freq(500)       # 500Hz — smooth for motor, no skakanie
         self.pwm_rev.freq(500)
 
