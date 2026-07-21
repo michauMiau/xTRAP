@@ -79,12 +79,12 @@ def on_joy_axis(win, stickid, axisid, value):
             angle = int(center_steer + value * (right_steer - center_steer))
         set_steer(angle=angle)
     elif axisid == 4:
-        # Left trigger → Reverse (-100% to 0%)
+        # Left trigger (LT) → Reverse (-100% to 0%)
         level = int(value * 100) if value < 0 else int(abs(value) * 100)
         set_throttle(-level if value < 0 else level)
     elif axisid == 5:
-        # Right trigger → Forward (+0% to +100%)
-        level = int(value * 100) if value > 0 else int(abs(value) * 100)
+        # Right trigger (RT) → Forward (+0% to +100%)
+        level = int(abs(value) * 100)
         set_throttle(level)
 
 
