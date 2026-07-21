@@ -57,7 +57,6 @@ backlight.freq(1000)     # set freq to reasonable amount
 backlight.duty(0)        # Backlight off
 
 # --- SERVO (smooth movement to reduce current spike) ---
-_last_set_angles = {}
 
 class Servo:
     """Smooth-stepping servo — moves toward target at `speed` deg/step,
@@ -67,7 +66,7 @@ class Servo:
         """
         pin   – GPIO number (int)
         speed – degrees per step; lower = slower, gentler on power supply.
-                Default 5: full sweep (~90°) takes ~180 ms at 20 ms/step.
+                Default 5: full sweep (~90 deg) takes ~180 ms at 20 ms/step.
         """
         self.pin = Pin(pin, Pin.OUT)
         self.speed = speed
@@ -81,13 +80,11 @@ class Servo:
 
     @staticmethod
     def angle_to_us(angle: int) -> int:
-        """Map 0-180° to 500-2500 µs pulse width."""
-        return int(500 + (angle / 180) * 2000)
+        """Map 0-180 degrees to 500-2500 microseconds pulse width."""
+        return int(500 + (angle / 180.0) * 2000)
 
     def get_current_angle(self) -> int:
-        """Return the last known angle (from instance or dict)."""
-        if id(self.pin) in _last_set_angles:
-            return _last_set_angles[id(self.pin)]
+        """Return the last known angle from this instance."""
         return self.angle
 
     def set_angle(self, angle, speed=None):
@@ -117,7 +114,6 @@ class Servo:
             if current == angle:
                 break
 
-        _last_set_angles[id(self.pin)] = angle  # track by pin object identity
         print("S" + str(angle))
 servo = Servo(2, speed=5)
 
