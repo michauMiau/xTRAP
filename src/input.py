@@ -41,10 +41,13 @@ def release_throttle():
 def on_joy_axis(win, stickid, axisid, value):
     """Handle gamepad joystick events.
     
+    Xbox/Linux standard: LT=axis 4 (0..-1 reverse), RT=axis 5 (0..+1 forward)
+    Steam Deck/others may use combined bipolar axis or different IDs.
+    
     Args:
         win: The window object
         stickid: Which controller (usually 0 for first pad)
-        axisid: Which axis changed (2=left x-stick, 5=right y-stick)
+        axisid: Which axis changed
         value: Position from -1.0 to 1.0 OR raw gamepad values (0..65535)
     """
     # Deadzone threshold — ignore small drift near center
@@ -62,24 +65,25 @@ def on_joy_axis(win, stickid, axisid, value):
     
     # Apply deadzone — values within ±DEADZONE become 0
     if abs(value) < DEADZONE:
-        value = 0.0
+        return  # Don't call set_throttle at all during deadzone
     
     # Map joystick axes to controls using configurable steering variables
-    # Axis 2 (left stick horizontal): Steering (-1.0 = full left, 1.0 = full right)
-    # Axis 5 (right stick vertical): Throttle (-1.0 = reverse, 1.0 = forward)
-    
     if axisid == 2:
-        # Map -1..0 to left_steer..center_steer, and 0..1 to center_steer..right_steer
+        # Axis 2 = left stick horizontal → Steering (-1.0 = full left, 1.0 = full right)
         if value < 0:
             # Left half: left_steer (45) → center_steer (90) when going -1.0 → 0.0
-            angle = int(left_steer + abs(value) * (center_steer - left_steer))
+            angle = int(left_steer + (1.0 - abs(value)) * (center_steer - left_steer))
         else:
             # Right half: center_steer (90) → right_steer (135) when going 0.0 → 1.0
             angle = int(center_steer + value * (right_steer - center_steer))
         set_steer(angle=angle)
+    elif axisid == 4:
+        # Axis 4 = Left Trigger (LT) → Reverse (-1.0 = full reverse, 0.0 = neutral)
+        level = int(value * 100) if value < 0 else int(abs(value) * 100)
+        set_throttle(-level if value < 0 else level)
     elif axisid == 5:
-        # Throttle with smooth granularity, max 99% on full trigger pull
-        level = int(value * 99) if value > 0 else int(value * 100)
+        # Axis 5 = Right Trigger (RT) → Forward (+1.0 = full forward, 0.0 = neutral)
+        level = int(value * 100)
         set_throttle(level)
 
 
