@@ -38,17 +38,6 @@ def release_steer():
 def release_throttle():
     set_throttle(0)
 
-
-# --- Throttle buttons: instant full power on press, zero on release ---
-def _forward_full_throttle():
-    """Forward button: instant 100% throttle."""
-    set_throttle(100)
-
-
-def _reverse_full_throttle():
-    """Reverse button: instant -100% throttle."""
-    set_throttle(-100)
-
 def on_joy_axis(win, stickid, axisid, value):
     """Handle gamepad joystick events.
     
@@ -126,11 +115,11 @@ def setup_button_bindings(steering_panel, throttle_panel):
 
     # Wire throttle buttons -- instant full power on press, zero on release
     throttle_panel.forward_btn.bind(
-        on_press=lambda *a: _forward_full_throttle(),
+        on_press=lambda *a: set_throttle(100),
         on_release=lambda *a: release_throttle(),
     )
     # Reverse: instant -100% on press, zero on release
     throttle_panel.reverse_btn.bind(
-        on_press=lambda *a: _reverse_full_throttle(),
+        on_press=lambda *a: set_throttle(-100),
         on_release=lambda *a: release_throttle(),
     )
