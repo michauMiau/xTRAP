@@ -66,7 +66,8 @@ def on_joy_axis(win, stickid, axisid, value):
     
     # Map joystick axes to controls using configurable steering variables
     # Axis 2 (left stick horizontal): Steering (-1.0 = full left, 1.0 = full right)
-    # Axis 5 (right stick vertical): Throttle (-1.0 = reverse, 1.0 = forward)
+    # Axis 4 (left trigger): Reverse (-1.0 = full reverse, 0.0 = neutral)
+    # Axis 5 (right trigger): Forward (+1.0 = full forward, 0.0 = neutral)
     
     if axisid == 2:
         # Map -1..0 to left_steer..center_steer, and 0..1 to center_steer..right_steer
@@ -77,10 +78,14 @@ def on_joy_axis(win, stickid, axisid, value):
             # Right half: center_steer (90) → right_steer (135) when going 0.0 → 1.0
             angle = int(center_steer + value * (right_steer - center_steer))
         set_steer(angle=angle)
-    elif axisid == 5:
-        # Throttle with smooth granularity, max 100% on full trigger pull
-        level = int(value * 100) if value > 0 else int(abs(value) * 100)
+    elif axisid == 4:
+        # Left trigger → Reverse (-100% to 0%)
+        level = int(value * 100) if value < 0 else int(abs(value) * 100)
         set_throttle(-level if value < 0 else level)
+    elif axisid == 5:
+        # Right trigger → Forward (+0% to +100%)
+        level = int(value * 100) if value > 0 else int(abs(value) * 100)
+        set_throttle(level)
 
 
 def setup_joystick():
