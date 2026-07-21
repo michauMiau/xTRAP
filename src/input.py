@@ -36,7 +36,7 @@ def release_steer():
 
 
 def release_throttle():
-    set_throttle(0)
+    set_throttle(0)  # Reset throttle to neutral (not steer!)
 
 def on_joy_axis(win, stickid, axisid, value):
     """Handle gamepad joystick events.
@@ -78,17 +78,16 @@ def on_joy_axis(win, stickid, axisid, value):
             # Right half: center_steer (90) → right_steer (135) when going 0.0 → 1.0
             angle = int(center_steer + value * (right_steer - center_steer))
         set_steer(angle=angle)
-    elif axisid == 4:
-        # Left trigger (LT) → Reverse (-100% to 0%)
-        if value < 0:
-            level = int(value * 100)
+    elif axisid == 5:
+        # Axis 5 = combined LT/RT on single axis (bipolar: -1..0 reverse, 0..+1 forward)
+        if value > 0:
+            level = int(value * 100)  # Forward: +0%..+100%
             set_throttle(level)
+        elif value < 0:
+            level = int(abs(value) * 100)  # Reverse: -100%..0%
+            set_throttle(-level)
         else:
             set_throttle(0)
-    elif axisid == 5:
-        # Right trigger (RT) → Forward (+0% to +100%)
-        level = int(abs(value) * 100)
-        set_throttle(level)
 
 
 def setup_joystick():
