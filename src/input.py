@@ -72,15 +72,15 @@ def on_joy_axis(win, stickid, axisid, value):
         # Map -1..0 to left_steer..center_steer, and 0..1 to center_steer..right_steer
         if value < 0:
             # Left half: left_steer (45) → center_steer (90) when going -1.0 → 0.0
-            angle = int(left_steer + abs(value) * (center_steer - left_steer))
+            angle = int(left_steer + (1.0 - abs(value)) * (center_steer - left_steer))
         else:
             # Right half: center_steer (90) → right_steer (135) when going 0.0 → 1.0
             angle = int(center_steer + value * (right_steer - center_steer))
         set_steer(angle=angle)
     elif axisid == 5:
-        # Throttle with smooth granularity, max 99% on full trigger pull
-        level = int(value * 99) if value > 0 else int(value * 100)
-        set_throttle(level)
+        # Throttle with smooth granularity, max 100% on full trigger pull
+        level = int(value * 100) if value > 0 else int(abs(value) * 100)
+        set_throttle(-level if value < 0 else level)
 
 
 def setup_joystick():
