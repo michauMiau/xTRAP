@@ -56,66 +56,27 @@ backlight = PWM(Pin(BACKLIGHT_PIN))
 backlight.freq(1000)     # set freq to reasonable amount
 backlight.duty(0)        # Backlight off
 
-# --- SERVO (smooth movement to reduce current spike) ---
-
+# --- SERVO ---
 class Servo:
-    """Smooth-stepping servo — moves toward target at `speed` deg/step,
-    not jumping instantly. Reduces peak current draw vs direct pulse."""
-
-    def __init__(self, pin, speed=5):
-        """
-        pin   – GPIO number (int)
-        speed – degrees per step; lower = slower, gentler on power supply.
-                Default 5: full sweep (~90 deg) takes ~180 ms at 20 ms/step.
-        """
+    def __init__(self, pin):
         self.pin = Pin(pin, Pin.OUT)
-        self.speed = speed
-        self.angle = 90
+        self.angle = 90 # Set 90 as default
 
     def write_pulse(self, us):
-        """Send a single servo pulse of `us` microseconds."""
         self.pin.on()
         time.sleep_us(us)
         self.pin.off()
 
-    @staticmethod
-    def angle_to_us(angle: int) -> int:
-        """Map 0-180 degrees to 500-2500 microseconds pulse width."""
-        return int(500 + (angle / 180.0) * 2000)
-
-    def get_current_angle(self) -> int:
-        """Return the last known angle from this instance."""
-        return self.angle
-
-    def set_angle(self, angle, speed=None):
-        """Move smoothly to `angle`. Returns immediately when already there."""
+    def set_angle(self, angle):
         angle = max(0, min(180, int(angle)))
-        speed = self.speed if speed is None else int(speed)
-        current = self.get_current_angle()
-
-        if current == angle:
-            return  # nothing to do
-
-        step = speed if (angle - current) > 0 else -speed
-        while True:
-            next_angle = current + step
-            if (step > 0 and next_angle >= angle) or (step < 0 and next_angle <= angle):
-                next_angle = angle  # snap to target on last step
-
-            pulse = Servo.angle_to_us(next_angle)
-            # 3 pulses per position (standard hobby-servo settling)
-            for _ in range(3):
-                self.write_pulse(pulse)
-                time.sleep_ms(20)
-
-            self.angle = next_angle
-            current = next_angle
-
-            if current == angle:
-                break
-
+        self.angle = angle
         print("S" + str(angle))
-servo = Servo(2, speed=5)
+        pulse = int(500 + (angle / 180) * 2000)
+        for _ in range(3):
+            self.write_pulse(pulse)
+            time.sleep_ms(20)
+
+servo = Servo(2)  # your servo pin
 
 # --- MOTOR (MX1508 Dual PWM) ---
 class Motor:
