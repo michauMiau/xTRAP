@@ -56,27 +56,65 @@ backlight = PWM(Pin(BACKLIGHT_PIN))
 backlight.freq(1000)     # set freq to reasonable amount
 backlight.duty(0)        # Backlight off
 
-# --- SERVO ---
+# --- SERVO (smooth non-blocking movement via hardware timer) ---
+from machine import Timer
+
 class Servo:
+    """Smooth servo with hardware timer — moves toward target at ~5°/step,
+    never blocking the main UDP receive loop."""
+
     def __init__(self, pin):
         self.pin = Pin(pin, Pin.OUT)
-        self.angle = 90 # Set 90 as default
+        self.angle = 90        # current position
+        self.target = None     # pending target (None = idle)
+        self.speed = 5         # degrees per step
+        self._timer = Timer(-1)
 
     def write_pulse(self, us):
         self.pin.on()
         time.sleep_us(us)
         self.pin.off()
 
-    def set_angle(self, angle):
-        angle = max(0, min(180, int(angle)))
-        self.angle = angle
-        print("S" + str(angle))
-        pulse = int(500 + (angle / 180) * 2000)
+    def _step(self, timer):
+        """Timer callback: one servo step per tick (~20ms)."""
+        if self.target is None or self.angle == self.target:
+            return
+
+        diff = self.target - self.angle
+        step_dir = 1 if diff > 0 else -1
+        nxt = self.angle + (step_dir * self.speed)
+
+        # Snap to target on last step
+        if (step_dir > 0 and nxt >= self.target) or \
+           (step_dir < 0 and nxt <= self.target):
+            nxt = self.target
+
+        pulse = int(500 + (nxt / 180.0) * 2000)
         for _ in range(3):
             self.write_pulse(pulse)
-            time.sleep_ms(20)
 
-servo = Servo(2)  # your servo pin
+        self.angle = nxt
+        if self.angle == self.target:
+            self.target = None
+
+    def set_angle(self, angle):
+        """Schedule smooth move to `angle` — non-blocking."""
+        angle = max(0, min(180, int(angle)))
+        if self.angle == angle:
+            return
+
+        self.target = angle
+        print("S" + str(angle))
+        try:
+            self._timer.init(period=20, mode=Timer.PERIODIC, callback=self._step)
+        except Exception:
+            pass
+
+    def get_current_angle(self):
+        """Return the last known position."""
+        return self.angle
+
+servo = Servo(2)
 
 # --- MOTOR (MX1508 Dual PWM) ---
 class Motor:
