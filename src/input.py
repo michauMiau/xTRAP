@@ -39,52 +39,46 @@ def release_throttle():
     set_throttle(0)
 
 def on_joy_axis(win, stickid, axisid, value):
-    """Handle gamepad joystick events.
+    """Handle gamepad joystick events (Linux/Steam Deck Xbox-style).
     
-    Xbox/Linux standard: LT=axis 4 (0..-1 reverse), RT=axis 5 (0..+1 forward)
-    Steam Deck/others may use combined bipolar axis or different IDs.
+    Axis map:
+        axis 2 = left stick X → steering (-1.0 left, 0 center, +1 right)
+        axis 4 = Left Trigger  → reverse throttle (0 neutral, -1 full reverse)
+        axis 5 = Right Trigger → forward throttle (+1 full forward, 0 neutral)
     
-    Args:
-        win: The window object
-        stickid: Which controller (usually 0 for first pad)
-        axisid: Which axis changed
-        value: Position from -1.0 to 1.0 OR raw gamepad values (0..65535)
+    Deadzone handling: when value crosses from active → deadzone, sends explicit
+    neutral commands (steer=center, throttle=0) to prevent stale state on the car.
     """
-    # Deadzone threshold — ignore small drift near center
-    DEADZONE = 0.1
-    
-    # Normalize value if it's in raw range (gamepads sometimes send 0..65535 or negative raw)
+    # Normalize raw values (gamepads sometimes send -32768..+32767)
     if abs(value) > 2.0:
-        if value > 0:
-            value = float(value / 32767.0)
-        else:
-            value = float(value / 32768.0)
+        value = float(value / 32768.0)
     
-    # Clamp to safe range just in case
     value = max(-1.0, min(1.0, value))
     
-    # Apply deadzone — values within ±DEADZONE become 0
-    if abs(value) < DEADZONE:
-        return  # Don't call set_throttle at all during deadzone
+    DEADZONE = 0.1
     
-    # Map joystick axes to controls using configurable steering variables
     if axisid == 2:
-        # Axis 2 = left stick horizontal → Steering (-1.0 = full left, 1.0 = full right)
-        if value < 0:
-            # Left half: left_steer (45) → center_steer (90) when going -1.0 → 0.0
-            angle = int(left_steer + (1.0 - abs(value)) * (center_steer - left_steer))
+        # Steering: linear interpolation from left_steer to right_steer
+        t = (value + 1.0) / 2.0  # -1..+1 → 0..1
+        angle = int(left_steer + round((right_steer - left_steer) * t))
+        if abs(value) < DEADZONE:
+            release_steer()
         else:
-            # Right half: center_steer (90) → right_steer (135) when going 0.0 → 1.0
-            angle = int(center_steer + value * (right_steer - center_steer))
-        set_steer(angle=angle)
+            set_steer(angle=angle)
     elif axisid == 4:
-        # Axis 4 = Left Trigger (LT) → Reverse (-1.0 = full reverse, 0.0 = neutral)
-        level = int(value * 100) if value < 0 else int(abs(value) * 100)
-        set_throttle(-level if value < 0 else level)
+        # Left Trigger → reverse only (value is always ≤ 0 on standard pads)
+        level = int(round(abs(value) * 100))
+        if abs(value) < DEADZONE:
+            release_throttle()
+        else:
+            set_throttle(-level)
     elif axisid == 5:
-        # Axis 5 = Right Trigger (RT) → Forward (+1.0 = full forward, 0.0 = neutral)
-        level = int(value * 100)
-        set_throttle(level)
+        # Right Trigger → forward only (value is always ≥ 0 on standard pads)
+        level = int(round(max(0.0, value) * 100))
+        if abs(value) < DEADZONE:
+            release_throttle()
+        else:
+            set_throttle(level)
 
 
 def setup_joystick():
