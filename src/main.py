@@ -84,12 +84,13 @@ class IPPanel(BoxLayout):
 
     def _save_ip(self):
         ip = self.ip_input.text.strip()
-        if not ip or not settings.set_car_ip(ip):
+        if not ip:
             return
+        settings.set_car_ip(ip)  # raises ValueError on empty (already checked)
         net.set_car_addr((ip, 5005))
         log.info(f"Car IP set to: {ip}")
-        if on_set_ip and callable(on_set_ip):
-            on_set_ip(ip)
+        if hasattr(self, '_on_set_ip') and callable(self._on_set_ip):
+            self._on_set_ip(ip)
 
 
 class SteeringPanel(BoxLayout):
@@ -233,6 +234,7 @@ class RCControlCenterApp(App):
         """Clean up when app exits — reset throttle to zero."""
         release_throttle()
         release_steer()
+        net.stop_network()
 
 
     def on_pause(self):
@@ -240,6 +242,7 @@ class RCControlCenterApp(App):
         log.info("App paused — releasing throttle/steer")
         release_throttle()
         release_steer()
+        net.stop_network()
         return True  # Allow Kivy to keep state on pause
 
 

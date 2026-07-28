@@ -17,6 +17,9 @@ _car_addr_lock = threading.Lock()
 
 PORT_RECV = 5005
 
+# Shutdown flag for recv_loop — checked on every iteration
+_recv_stop_event = threading.Event()
+
 
 def get_car_addr():
     """Thread-safe getter for CAR_ADDR."""
@@ -35,6 +38,11 @@ def set_car_addr(addr):
             _car_addr_list[1] = addr[1]
 
 
+def stop_network():
+    """Signal recv_loop to shut down gracefully."""
+    _recv_stop_event.set()
+
+
 def network_loop():
     """Start the network receive loop in a background thread."""
 
@@ -44,9 +52,8 @@ def network_loop():
             sock.bind(("0.0.0.0", PORT_RECV))
             sock.settimeout(0.1)  # Non-blocking with timeout for CPU safety
 
-            latest = None
-
-            while True:
+            while not _recv_stop_event.is_set():
+                latest = None  # Reset each iteration — prevents stale replay
                 try:
                     data, _ = sock.recvfrom(1024)
                     latest = data
@@ -59,8 +66,14 @@ def network_loop():
                 if latest:
                     try:
                         msg = latest.decode().split(",")
+                        if len(msg) < 1:
+                            continue
 
                         if msg[0] == "M":
+                            # Validate we have at least 3 values for IMU data
+                            if len(msg) < 4:
+                                log.debug(f"[recv_loop] M message incomplete: {len(msg)} fields")
+                                continue
                             ax, ay, az = map(float, msg[1:])
                             with state._lock:
                                 state.ax = ax
