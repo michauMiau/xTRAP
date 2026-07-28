@@ -5,11 +5,14 @@ import time
 import logging
 import threading
 from state import state
+import settings
 
 log = logging.getLogger(__name__)
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-_car_addr_list = ["192.168.1.226", 5005]  # mutable list for thread-safe updates
+send_sock.settimeout(5.0)  # Prevent blocking on offline car
+
+_car_addr_list = [settings.get_car_ip(), 5005]  # mutable list for thread-safe updates
 _car_addr_lock = threading.Lock()
 
 PORT_RECV = 5005
@@ -26,6 +29,7 @@ def set_car_addr(addr):
     if isinstance(addr, str):
         addr = (addr, 5005)
     with _car_addr_lock:
+        settings.set_car_ip(addr[0])
         _car_addr_list[0] = addr[0]
         if len(addr) > 1:
             _car_addr_list[1] = addr[1]
