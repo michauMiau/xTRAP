@@ -91,6 +91,12 @@ class PanelUI(BoxLayout):
             addr_tuple = (ip, 5005)
         
         net.set_car_addr(addr_tuple)
+        # Persist to settings
+        try:
+            import settings
+            settings.set_car_ip(ip)
+        except Exception as e:
+            log.debug(f"[PanelUI] failed to persist IP: {e}")
         self._show_status(f"Set!", (0.3, 1, 0.3, 1))
 
     def _show_status(self, text, color):
