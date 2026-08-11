@@ -17,6 +17,8 @@ _car_addr_lock = threading.Lock()
 
 PORT_RECV = 5005
 
+_recv_stop_event = threading.Event()
+
 
 def get_car_addr():
     """Thread-safe getter for CAR_ADDR."""

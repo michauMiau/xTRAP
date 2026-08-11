@@ -7,6 +7,7 @@ In Kivy:
 
 """
 
+import logging
 import socket
 import threading
 from kivy.clock import Clock as KClock
@@ -16,6 +17,8 @@ from kivy.uix.button import Button as KButton
 from kivy.uix.slider import Slider as KSlider
 from kivy.uix.textinput import TextInput as KTextInput
 from kivy.uix.label import Label as KLabel
+
+log = logging.getLogger(__name__)
 
 
 class PanelUI(BoxLayout):
@@ -91,12 +94,6 @@ class PanelUI(BoxLayout):
             addr_tuple = (ip, 5005)
         
         net.set_car_addr(addr_tuple)
-        # Persist to settings
-        try:
-            import settings
-            settings.set_car_ip(ip)
-        except Exception as e:
-            log.debug(f"[PanelUI] failed to persist IP: {e}")
         self._show_status(f"Set!", (0.3, 1, 0.3, 1))
 
     def _show_status(self, text, color):
