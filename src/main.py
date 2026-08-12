@@ -1,7 +1,5 @@
 """Main entry point for the RC Control Center — cross-platform (Android/PC/Steam Deck)"""
 
-import os
-import sys
 import logging
 
 from kivy.app import App

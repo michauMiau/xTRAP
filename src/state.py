@@ -14,9 +14,7 @@ class State:
         self.max_g = 0.0      # Peak G-force recorded
 
         # Battery levels (updated by network recv thread)
-        self.batt_v = 0.0     # Car battery voltage
         self.batt_pct = 0.0   # Car battery percentage (0-100)
-        self.phone_pct = 0.0  # Phone battery percentage
 
         # Steering and throttle (updated by input handlers)
         self.steer = 90       # Default: straight ahead (0-180 degrees)
