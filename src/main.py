@@ -14,7 +14,7 @@ from state import state
 import network as net
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
-from input import setup_button_bindings, setup_joystick, release_throttle, release_steer
+from input import setup_button_bindings, setup_joystick, release_throttle, release_steer, cleanup_joystick
 
 log = logging.getLogger(__name__)
 
@@ -198,6 +198,8 @@ class RCControlCenterApp(App):
         """Release control surfaces before exit/pause."""
         release_throttle()
         release_steer()
+        net.stop_network()
+        cleanup_joystick()
 
 
     def update_ui(self, dt):
