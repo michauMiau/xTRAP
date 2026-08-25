@@ -7,15 +7,18 @@ In Kivy:
 
 """
 
+import logging
 import socket
-import threading
-from kivy.clock import Clock as KClock
-from kivy.network.urlrequest import UrlRequest
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.slider import Slider as KSlider
 from kivy.uix.textinput import TextInput as KTextInput
 from kivy.uix.label import Label as KLabel
+
+import network as net
+import settings
+
+log = logging.getLogger(__name__)
 
 
 class PanelUI(BoxLayout):
@@ -71,8 +74,6 @@ class PanelUI(BoxLayout):
 
     def _connect(self, *args):
         """Handle connect button press — trust user input, set address directly."""
-        import network as net
-        
         ip = self.car_ip_input.text.strip()
         
         # Parse IP:port or just IP (default port 5005)

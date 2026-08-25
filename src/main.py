@@ -2,7 +2,7 @@
 
 import os
 import sys
-import logging
+
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -36,7 +36,7 @@ class StatusPanel(BoxLayout):
         # Battery display
         self.battery = Battery()  # Use the Kivy Battery widget
 
-        # G-meter text (from original main.py — keeps the G calculation logic from state)
+        # G-meter text
         self.g_label = Label(
             text=f"G: {state.g:.2f} MAX: {state.max_g:.2f}",
             font_size=18,
@@ -194,8 +194,8 @@ class MainLayout(GridLayout):
 
         self.add_widget(control_row)
 
-        # IP display at bottom (placeholder — will add real IP management later)
-        self.ui_panel = IPPanel()
+        # IP display at bottom — PanelUI from widgets handles car IP + phone IP input
+        self.ui_panel = PanelUI()
         self.add_widget(self.ui_panel)
 
 
@@ -230,18 +230,18 @@ class RCControlCenterApp(App):
 
 
     def on_stop(self):
-        """Clean up when app exits — reset throttle to zero."""
-        release_throttle()
-        release_steer()
-
+        """Clean up when app exits — reset throttle and steer."""
+        self._cleanup()
 
     def on_pause(self):
         """Called when app is minimized/backgrounded (mobile)."""
-        log.info("App paused — releasing throttle/steer")
-        release_throttle()
-        release_steer()
+        self._cleanup()
         return True  # Allow Kivy to keep state on pause
 
+    def _cleanup(self):
+        """Release control surfaces before exit/pause."""
+        release_throttle()
+        release_steer()
 
 
     def update_ui(self, dt):
