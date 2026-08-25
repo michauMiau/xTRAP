@@ -1,6 +1,8 @@
 """Main entry point for the RC Control Center — cross-platform (Android/PC/Steam Deck)"""
 
-import logging
+import os
+import sys
+
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -9,9 +11,11 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
 
 from state import state
 import network as net
+import settings
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 from input import setup_button_bindings, setup_joystick, release_throttle, release_steer
@@ -22,7 +26,7 @@ log = logging.getLogger(__name__)
 class StatusPanel(BoxLayout):
     """Status bar — battery + G-meter (horizontal layout)"""
 
-    def __init__(self):
+    def __init__(self, on_set_ip=None):
         super().__init__()
 
         self.orientation = "horizontal"
@@ -46,6 +50,46 @@ class StatusPanel(BoxLayout):
         self.add_widget(self.battery)
         self.add_widget(spacer)
         self.add_widget(self.g_label)
+
+
+class IPPanel(BoxLayout):
+    """IP configuration panel — input + save button"""
+
+    def __init__(self, on_set_ip=None):
+        super().__init__()
+
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = 40
+
+        self.ip_input = TextInput(
+            text=settings.get_car_ip(),
+            hint_text="Car IP",
+            size_hint_x=0.7,
+            font_size=18,
+            multiline=False
+        )
+
+        save_btn = KButton(
+            text="Save",
+            size_hint_x=0.3,
+            font_size=18,
+            background_color=(0.2, 0.5, 0.2, 1),
+            color=(1, 1, 1, 1)
+        )
+        save_btn.bind(on_press=lambda *a: self._save_ip())
+
+        self.add_widget(self.ip_input)
+        self.add_widget(save_btn)
+
+    def _save_ip(self):
+        ip = self.ip_input.text.strip()
+        if not ip or not settings.set_car_ip(ip):
+            return
+        net.set_car_addr((ip, 5005))
+        log.info(f"Car IP set to: {ip}")
+        if on_set_ip and callable(on_set_ip):
+            on_set_ip(ip)
 
 
 class SteeringPanel(BoxLayout):
