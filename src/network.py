@@ -1,7 +1,6 @@
 # network.py — centralized networking for RC control
 import socket
 import math
-import time
 import logging
 import threading
 from state import state
@@ -60,8 +59,6 @@ def network_loop():
                 if latest:
                     try:
                         msg = latest.decode().split(",")
-                        if len(msg) < 1:
-                            continue
 
                         if msg[0] == "M":
                             # Validate we have at least 3 values for IMU data
@@ -81,8 +78,13 @@ def network_loop():
 
                         elif msg[0] == "B":
                             if len(msg) > 1:
-                                with state._lock:
-                                    state.batt_pct = float(msg[1])
+                                try:
+                                    pct = float(msg[1])
+                                    if 0 <= pct <= 100:
+                                        with state._lock:
+                                            state.batt_pct = pct
+                                except ValueError:
+                                    pass
 
                     except Exception as e:
                         log.debug(f"[recv_loop] parse error: {e}")
@@ -93,8 +95,12 @@ def network_loop():
             except Exception:
                 pass
 
-    _threading = threading
-    _threading.Thread(target=recv_loop, daemon=True).start()
+    threading.Thread(target=recv_loop, daemon=True).start()
+
+
+def stop_network():
+    """Signal recv_loop to stop (graceful shutdown)."""
+    _recv_stop_event.set()
 
 
 def send_steering(angle):

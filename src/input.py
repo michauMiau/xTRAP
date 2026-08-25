@@ -86,6 +86,11 @@ def setup_joystick():
     Window.bind(on_joy_axis=on_joy_axis)
 
 
+def cleanup_joystick():
+    """Unbind joystick event handler on pause/stop."""
+    Window.unbind(on_joy_axis=on_joy_axis)
+
+
 def setup_button_bindings(steering_panel, throttle_panel):
     """Bind input handlers to UI buttons.
     Called from main.py's build() method after panels are created.
