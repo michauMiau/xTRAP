@@ -10,11 +10,13 @@ def get_car_ip():
     return Config.get("xtrap", "car_ip") or "192.168.1.226"
 
 
-def set_car_ip(ip: str):
-    """Save car IP to persistent config."""
+def set_car_ip(ip: str) -> bool:
+    """Save car IP to persistent config. Returns True on success, False if rejected."""
+    ip = ip.strip() if ip else ""
     if not ip:
-        raise ValueError("IP cannot be empty")
+        return False
     if not Config.has_section("xtrap"):
         Config.add_section("xtrap")
     Config.set("xtrap", "car_ip", ip)
     Config.write()
+    return True

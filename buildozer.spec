@@ -328,7 +328,16 @@ android.debug_artifact = apk
 #p4a.fork = kivy
 
 # (str) python-for-android branch to use, defaults to master
-#p4a.branch = master
+#
+# develop is required here: p4a master only supports Python <= 3.12, but the
+# hostpython3 recipe resolves to CPython 3.14, so charset-normalizer comes
+# back as a cp314 wheel that p4a cannot install:
+#   ERROR: charset_normalizer-3.5.1-cp314-cp314-android_24_arm64_v8a.whl
+#          is not a supported wheel on this platform
+# (kivy/buildozer#2051, kivy/python-for-android#2755). develop is the branch
+# that supports 3.14. Per buildozer's install docs it must be built with
+# Python 3.14 + `pip install legacy-cgi setuptools cython==0.29.34`.
+p4a.branch = develop
 
 # (str) python-for-android specific commit to use, defaults to HEAD, must be within p4a.branch
 #p4a.commit = HEAD
