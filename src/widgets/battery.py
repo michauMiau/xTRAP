@@ -8,6 +8,8 @@ In Kivy:
 
 from kivy.uix.label import Label
 
+from ui_scale import scaled
+
 
 class Battery(Label):
     """Kivy battery widget — shows car battery percentage
@@ -25,10 +27,10 @@ class Battery(Label):
 
         # Default display
         self.text = "Car: 0%"
-        self.font_size = 18
+        self.font_size = scaled(18)
         self.size_hint_x = 1.0
         self.size_hint_y = None
-        self.height = 25
+        self.height = scaled(25)
         self.background_color = (0.2, 0.2, 0.2)
         self.color = (1, 1, 1, 1)  # White by default — RGBA format
 
