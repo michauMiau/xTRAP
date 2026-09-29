@@ -1,6 +1,6 @@
 """Main entry point for the RC Control Center — cross-platform (Android/PC/Steam Deck)"""
 
-import log
+import logging
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -56,6 +56,7 @@ class IPPanel(BoxLayout):
     def __init__(self, on_set_ip=None):
         super().__init__()
 
+        self.on_set_ip = on_set_ip
         self.orientation = "horizontal"
         self.size_hint_y = None
         self.height = 40
@@ -82,12 +83,12 @@ class IPPanel(BoxLayout):
 
     def _save_ip(self):
         ip = self.ip_input.text.strip()
-        if not ip or not settings.set_car_ip(ip):
+        if not settings.set_car_ip(ip):
             return
         net.set_car_addr((ip, 5005))
         log.info(f"Car IP set to: {ip}")
-        if on_set_ip and callable(on_set_ip):
-            on_set_ip(ip)
+        if self.on_set_ip and callable(self.on_set_ip):
+            self.on_set_ip(ip)
 
 
 class SteeringPanel(BoxLayout):

@@ -8,7 +8,6 @@ In Kivy:
 """
 
 import logging
-import socket
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button as KButton
 from kivy.uix.slider import Slider as KSlider
@@ -16,7 +15,6 @@ from kivy.uix.textinput import TextInput as KTextInput
 from kivy.uix.label import Label as KLabel
 
 import network as net
-import settings
 
 log = logging.getLogger(__name__)
 
