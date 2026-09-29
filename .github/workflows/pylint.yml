@@ -5,14 +5,20 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
-      - '.github/workflows/build-apk.yml'
-      - 'buildozer.spec'
+      - 'tests/**'
+      - 'rcar.py'
+      - 'main.py'
+      - '.github/workflows/pylint.yml'
+      - '.pylintrc'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
-      - '.github/workflows/build-apk.yml'
-      - 'buildozer.spec'
+      - 'tests/**'
+      - 'rcar.py'
+      - 'main.py'
+      - '.github/workflows/pylint.yml'
+      - '.pylintrc'
 
 jobs:
   build:

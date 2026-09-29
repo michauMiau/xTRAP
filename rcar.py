@@ -12,6 +12,31 @@ import gc
 batt = Battery()
 pct = batt.read_pct() # The battery percent var to send
 
+# --- PINS ---
+# Every output in one place, so a rewiring is a diff here and not a hunt
+# through the driver classes.
+#
+# Board is a Cardputer ADV on MicroHydra, whose mpconfigboard.h sets
+# MICROPY_HW_I2C0_SDA/SCL to 8/9 — so I2C(0) further down is GPIO8/9 and
+# does not collide with the pins below. (The vendor's stock Cardputer
+# firmware maps I2C(0) to GPIO1/2, which WOULD collide with servo_left.)
+# Do not infer bus pins from a bus number.
+#
+# verified on the bench: motor_in1, motor_in2, servo_left
+# never driven by this firmware: servo_right
+PINS = {
+    "servo_left":  2,
+    "servo_right": 3,
+    "motor_in1":   6,   # MX1508 IN1 — forward PWM
+    "motor_in2":   4,   # MX1508 IN2 — reverse PWM
+    "backlight":   38,
+}
+
+# Stop the motor when no throttle command has arrived for this long. The main
+# loop runs every ~20ms, so 1000ms is 50 iterations of margin. The car is a
+# slow bench toy, so that blind window is acceptable for it.
+FAILSAFE_MS = 1000
+
 # --- WIFI ---
 nic = network.WLAN(network.STA_IF)
 config = Config()
@@ -51,7 +76,7 @@ def read_accel():
 
 
 # CONFIGURING THE SCREEN BACKLIGHT PWM SO IT DOESN'T GO CRAZY
-BACKLIGHT_PIN = 38  # Skip this whole section if you don't have a cardputer/backlight
+BACKLIGHT_PIN = PINS["backlight"]  # Skip this whole section if you don't have a cardputer/backlight
 backlight = PWM(Pin(BACKLIGHT_PIN))
 backlight.freq(1000)     # set freq to reasonable amount
 backlight.duty(0)        # Backlight off
@@ -59,23 +84,41 @@ backlight.duty(0)        # Backlight off
 # --- SERVO (smooth non-blocking via main-loop time check) ---
 
 class Servo:
-    """Smooth servo stepping driven by main loop tick check.
-    No sleeps inside set_angle() — movement happens one step per ~20ms iteration."""
+    """Servo driven by hardware PWM at 50Hz.
+
+    The previous version bit-banged the pin with sleep_us and emitted three
+    pulses back to back. Two separate faults came out of that:
+
+    - `pulse` for 90deg is 1500us, so three with no gap is 4500us of
+      continuous HIGH — about 3x what a hobby servo accepts (500-2500us).
+      That is not a stiffer command, it is out of spec, and the servo drives
+      into the end stop.
+    - `_step()` returned early once `angle == target`, so the servo then got
+      no pulses at all. A servo has no holding torque without a frame, so it
+      sagged the moment it arrived.
+
+    Handing the 20ms frame to the LEDC peripheral fixes both: the channel
+    keeps emitting forever, so there is always a holding signal, and
+    set_angle() no longer busy-waits, so the receive loop never stalls.
+    """
 
     def __init__(self, pin):
-        self.pin = Pin(pin, Pin.OUT)
+        # 50Hz frame, duty 0 until the first command arrives.
+        self.pwm = PWM(Pin(pin), freq=50, duty=0)
         self.angle = 90
         self.target = None
         self.speed = 5
         self._last_step_time = 0
+        self._write(90)
 
-    def write_pulse(self, us):
-        self.pin.on()
-        time.sleep_us(us)
-        self.pin.off()
+    def _write(self, angle):
+        """Set the LEDC duty for `angle` — 500..2500us out of a 20ms frame."""
+        pulse_us = 500 + (angle / 180.0) * 2000
+        self.pwm.duty_ns(int(pulse_us * 1000))
+        self.angle = angle
 
     def _step(self):
-        """Execute a single servo step. Called from main loop, never blocks."""
+        """Advance one step. Kept for the main loop's 20ms tick."""
         if self.target is None or self.angle == self.target:
             return False
 
@@ -88,12 +131,9 @@ class Servo:
            (step_dir < 0 and nxt <= self.target):
             nxt = self.target
 
-        pulse = int(500 + (nxt / 180.0) * 2000)
-        # Single pulse only (no loop of 3×) to keep this non-blocking
-        for _ in range(3):
-            self.write_pulse(pulse)
-
-        self.angle = nxt
+        # Hardware emits the pulse and keeps the frame going, so there is no
+        # gap problem and no need to keep writing once the target is reached.
+        self._write(nxt)
         return self.angle == self.target
 
     def set_angle(self, angle):
@@ -108,14 +148,17 @@ class Servo:
         """Return the last known position."""
         return self.angle
 
-servo = Servo(2)
+# The steering linkage connects both servos mechanically, so they are driven
+# together: GPIO3 is wired but this firmware had never driven it.
+servo = Servo(PINS["servo_left"])
+servo_2 = Servo(PINS["servo_right"])
 
 # --- MOTOR (MX1508 Dual PWM) ---
 class Motor:
     def __init__(self):
         # MX1508 needs two independent PWM pins for full power control
-        self.pwm_fwd = PWM(Pin(6))   # IN1 — forward direction
-        self.pwm_rev = PWM(Pin(4))   # IN2 — reverse direction
+        self.pwm_fwd = PWM(Pin(PINS["motor_in1"]))   # IN1 — forward direction
+        self.pwm_rev = PWM(Pin(PINS["motor_in2"]))   # IN2 — reverse direction
         self.pwm_fwd.freq(500)       # 500Hz — smooth for motor, no skakanie
         self.pwm_rev.freq(500)
 
@@ -159,6 +202,10 @@ connect_wifi()
 
 last_stats_time = 0
 gc_collect_at = 0
+# When the motor was last commanded. A plain timestamp, compared with
+# ticks_diff below — never a sticky boolean, which would latch true after the
+# first packet and disable the failsafe completely.
+last_drive_time = time.ticks_ms()
 
 
 def gc_collect():
@@ -173,9 +220,13 @@ while True:
     now = time.ticks_ms()
 
     # --- SERVO STEP (throttled to ~50Hz) ---
+    # Both servos step together — they are one mechanism, so they must not
+    # drift apart. Same 20ms tick for each, so they stay in lockstep.
     if time.ticks_diff(now, servo._last_step_time) >= 20:
         done = servo._step()
+        servo_2._step()
         servo._last_step_time = now
+        servo_2._last_step_time = now
 
     gc_collect()
 
@@ -194,14 +245,29 @@ while True:
         if parts[0] == "S" and len(parts) > 1:
             angle = int(parts[1])
             servo.set_angle(angle)
+            servo_2.set_angle(angle)
 
         # T command: set throttle once, hold state until next T packet (T0 stops motor)
         if parts[0] == "T" and len(parts) > 1:
             throttle = int(parts[1])
             motor.run(throttle)
+            last_drive_time = now
             print("T" + str(throttle))
     except Exception:
         pass
+
+    # --- FAILSAFE ---
+    # No throttle command for FAILSAFE_MS, so stop the motor. Without this,
+    # T,100 latched forever: a dropped WiFi link or a crashed client left the
+    # car at full throttle with nobody holding the controls.
+    #
+    # stop() is called on every tick past the threshold, not only on the first
+    # one: a T0 may never arrive, and the motor has to stay off regardless.
+    # Refreshing the timestamp just rate-limits the message.
+    if time.ticks_diff(now, last_drive_time) > FAILSAFE_MS:
+        motor.stop()
+        last_drive_time = now
+        print("FAILSAFE: no drive command for", FAILSAFE_MS, "ms — motor stopped")
 
     # --- SLOW ---
     if time.ticks_diff(now, last_stats_time) > 5000: # Lowered the time to 5s
