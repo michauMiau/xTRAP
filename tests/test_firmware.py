@@ -138,14 +138,22 @@ def test_no_gpio_literals_outside_the_pins_block(fw):
 
 
 def test_i2c_bus_pins_are_documented_as_8_9():
-    """I2C(0) is GPIO8/9 on this firmware, not GPIO2/3.
+    """The pin map has to record that I2C(0) is GPIO8/9, not GPIO2/3.
 
     The theory that GPIO2/3 were the I2C bus was wrong and cost a reflash.
-    The mpconfigboard.h defines are the only authority, so the firmware has to
-    record them next to the pin map.
+    So the firmware states the resolved pins, where they come from, and that
+    the obvious alternative collides with a servo. An earlier version of this
+    test only grepped for a macro name, so deleting the whole warning still
+    passed; it now fails when the collision warning is gone.
     """
-    assert "MICROPY_HW_I2C0_SDA" in SOURCE
     assert re.search(r"I2C\(0\)", SOURCE)
+    assert re.search(r"GPIO8/9", SOURCE)
+    assert "mpconfigboard.h" in SOURCE
+
+    # The warning must survive, not just the pin claim.
+    warning = SOURCE[SOURCE.index("I2C(0) is"):SOURCE.index("PINS = {")]
+    assert re.search(r"GPIO1/2", warning), "stock-firmware collision warning is gone"
+    assert re.search(r"collide", warning), "the consequence is not stated"
 
 
 # --- servo ------------------------------------------------------------------

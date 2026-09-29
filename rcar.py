@@ -16,14 +16,12 @@ pct = batt.read_pct() # The battery percent var to send
 # Every output in one place, so a rewiring is a diff here and not a hunt
 # through the driver classes.
 #
-# Board is a Cardputer ADV on MicroHydra, whose mpconfigboard.h sets
-# MICROPY_HW_I2C0_SDA/SCL to 8/9 — so I2C(0) further down is GPIO8/9 and
-# does not collide with the pins below. (The vendor's stock Cardputer
-# firmware maps I2C(0) to GPIO1/2, which WOULD collide with servo_left.)
-# Do not infer bus pins from a bus number.
+# I2C(0) is GPIO8/9 on this firmware, per MicroHydra's mpconfigboard.h. Do not
+# infer bus pins from a bus number: the stock Cardputer firmware maps I2C(0)
+# to GPIO1/2, which would collide with servo_left.
 #
-# verified on the bench: motor_in1, motor_in2, servo_left
-# never driven by this firmware: servo_right
+# bench-verified: motor_in1, motor_in2, servo_left
+# never driven before: servo_right
 PINS = {
     "servo_left":  2,
     "servo_right": 3,
@@ -33,8 +31,7 @@ PINS = {
 }
 
 # Stop the motor when no throttle command has arrived for this long. The main
-# loop runs every ~20ms, so 1000ms is 50 iterations of margin. The car is a
-# slow bench toy, so that blind window is acceptable for it.
+# loop runs every ~20ms, so 1000ms is 50 iterations of margin.
 FAILSAFE_MS = 1000
 
 # --- WIFI ---
@@ -84,22 +81,11 @@ backlight.duty(0)        # Backlight off
 # --- SERVO (smooth non-blocking via main-loop time check) ---
 
 class Servo:
-    """Servo driven by hardware PWM at 50Hz.
+    """Steering servo on hardware PWM.
 
-    The previous version bit-banged the pin with sleep_us and emitted three
-    pulses back to back. Two separate faults came out of that:
-
-    - `pulse` for 90deg is 1500us, so three with no gap is 4500us of
-      continuous HIGH — about 3x what a hobby servo accepts (500-2500us).
-      That is not a stiffer command, it is out of spec, and the servo drives
-      into the end stop.
-    - `_step()` returned early once `angle == target`, so the servo then got
-      no pulses at all. A servo has no holding torque without a frame, so it
-      sagged the moment it arrived.
-
-    Handing the 20ms frame to the LEDC peripheral fixes both: the channel
-    keeps emitting forever, so there is always a holding signal, and
-    set_angle() no longer busy-waits, so the receive loop never stalls.
+    A servo needs a continuous 20ms frame, not a burst of pulses: without
+    one it has no holding torque and sags. So the 50Hz frame is left running
+    on the LEDC peripheral and set_angle() only changes the duty.
     """
 
     def __init__(self, pin):
@@ -131,8 +117,7 @@ class Servo:
            (step_dir < 0 and nxt <= self.target):
             nxt = self.target
 
-        # Hardware emits the pulse and keeps the frame going, so there is no
-        # gap problem and no need to keep writing once the target is reached.
+        # Hardware keeps the frame running, so the target needs no extra pulses.
         self._write(nxt)
         return self.angle == self.target
 
@@ -148,8 +133,7 @@ class Servo:
         """Return the last known position."""
         return self.angle
 
-# The steering linkage connects both servos mechanically, so they are driven
-# together: GPIO3 is wired but this firmware had never driven it.
+# The linkage connects both servos mechanically, so they are driven together.
 servo = Servo(PINS["servo_left"])
 servo_2 = Servo(PINS["servo_right"])
 
@@ -202,9 +186,8 @@ connect_wifi()
 
 last_stats_time = 0
 gc_collect_at = 0
-# When the motor was last commanded. A plain timestamp, compared with
-# ticks_diff below — never a sticky boolean, which would latch true after the
-# first packet and disable the failsafe completely.
+# When the motor was last commanded. A timestamp, not a sticky boolean —
+# a boolean would latch true after the first packet and disable the failsafe.
 last_drive_time = time.ticks_ms()
 
 
@@ -220,8 +203,7 @@ while True:
     now = time.ticks_ms()
 
     # --- SERVO STEP (throttled to ~50Hz) ---
-    # Both servos step together — they are one mechanism, so they must not
-    # drift apart. Same 20ms tick for each, so they stay in lockstep.
+    # Both step together — one mechanism, so they must not drift apart.
     if time.ticks_diff(now, servo._last_step_time) >= 20:
         done = servo._step()
         servo_2._step()
@@ -257,13 +239,9 @@ while True:
         pass
 
     # --- FAILSAFE ---
-    # No throttle command for FAILSAFE_MS, so stop the motor. Without this,
-    # T,100 latched forever: a dropped WiFi link or a crashed client left the
-    # car at full throttle with nobody holding the controls.
-    #
-    # stop() is called on every tick past the threshold, not only on the first
-    # one: a T0 may never arrive, and the motor has to stay off regardless.
-    # Refreshing the timestamp just rate-limits the message.
+    # stop() runs on every tick past the threshold, not only the first: a T0
+    # may never arrive, and the motor has to stay off regardless. Refreshing
+    # the timestamp just rate-limits the message.
     if time.ticks_diff(now, last_drive_time) > FAILSAFE_MS:
         motor.stop()
         last_drive_time = now
