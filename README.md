@@ -16,12 +16,14 @@ Remote-controlled driving robot built from Technic (but yours doesn't have to be
 - Cardputer board flashed with MicroHydra
 - WiFi connection between the Cardputer and PC
 
-The client connects to the robot's IP on port 5006 for steering commands and listens on port 5005 for sensor data.
+The client sends commands to the robot on port 5005 (the firmware binds the same port for both directions) and receives telemetry on the same socket.
 
 ### Running on the Cardputeer
 
-- `rcar.py` — main firmware: reads accelerometer, sends UDP telemetry, receives steering commands from PC, controls servo
-- `Acceleration_live_recorder.py` — standalone Cardputer app for testing the accelerometer
+- `rcar.py` — main firmware: receives `S`/`T` commands over UDP, drives both
+  steering servos (GPIO2 + GPIO3, in lockstep) and the MX1508 motor
+  (GPIO6/GPIO4), and sends battery telemetry. Stops the motor if no throttle
+  command arrives for 1000ms.
 
 ## Hardware
 
@@ -29,14 +31,14 @@ The client connects to the robot's IP on port 5006 for steering commands and lis
 | --------- | ------- |
 | ESP32 / Micropython | Main controller on Cardputer |
 | BMI270 (I²C) | 6-DoF accelerometer/gyro for orientation + G-force detection |
-| Servo | Steering control — receives angle commands from PC |
+| Servo ×2 | Steering — GPIO2 and GPIO3, driven in lockstep (the linkage connects them) |
 | Motor controller | Drives motor for movement |
 
 ## Network Protocol
 
 All communication is over raw UDP:
-
-- **Client → ESP32**: `S,<angle>` — steering command (0–180 degrees), port 5006
+- **Client → ESP32**: `S,<angle>` — steering command (0–180 degrees), port 5005
+- **Client → ESP32**: `T,<throttle>` — throttle −100…100, port 5005. The motor stops on its own if no `T` arrives for 1000ms
 - **ESP32 → Client**: `M,ax,ay,az` — accelerometer data, port 5005
 - **ESP32 → Client**: `B,pct` — battery percentage (sent every ~10s), port 5005
 

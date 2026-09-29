@@ -38,22 +38,38 @@ The robot runs Micropython on an ESP32/LeafLabs board mounted inside the Cardput
 | Module | Pin/Address | Purpose |
 | ------ | ----------- | ------- |
 | WiFi | STA_IF | Station mode, connects to local network |
-| I²C | 0 | Bus for BMI270 accelerometer (local use only) |
+| I²C | 0 → **GPIO8 SDA / GPIO9 SCL** | Bus for BMI270 accelerometer. Resolved from the firmware's own `mpconfigboard.h` defines (`MICROPY_HW_I2C0_SDA/SCL`), **not** from the bus number — the vendor's stock Cardputer firmware maps `I2C(0)` to GPIO1/2, which would collide with the servos |
 | Battery | ADC pin | Reads battery percentage via `battlevel` library |
-| Backlight | Pin 38 | PWM-controlled display backlight (screen off by default) |
-| Servo | Pin 4 | Steering — writes pulse width based on received angle |
+| Backlight | GPIO38 | PWM-controlled display backlight (screen off by default) |
+| Servo (left) | GPIO2 | Steering — hardware PWM, 50Hz |
+| Servo (right) | GPIO3 | Steering — driven in lockstep with the left servo; the linkage connects them mechanically |
+| Motor IN1 | GPIO6 | MX1508 forward PWM, 500Hz |
+| Motor IN2 | GPIO4 | MX1508 reverse PWM, 500Hz |
+
+All of these are declared once in the `PINS` dict at the top of `rcar.py`; the
+driver classes read from it, so there are no bare GPIO numbers left in the code.
+
+**Motor failsafe:** if no `T,<throttle>` command arrives within `FAILSAFE_MS`
+(1000ms), the firmware calls `motor.stop()`. Without it a `T,100` latched
+forever and a dropped WiFi link left the car at full throttle. The check is a
+plain `time.ticks_diff` comparison against a timestamp, never a sticky flag.
 
 **Network Protocol:**
 
-- **Inbound (polling):** Listens on port 5005 for `S,<angle>` steering commands
-- **Outbound (every ~5s):** `B,pct` battery percentage sent via UDP to PC IP:5005
+- **Inbound (polling):** Listens on port 5005 for `S,<angle>` and `T,<throttle>`
+- **Outbound (every ~5s):** `B,pct,0` battery percentage sent via UDP to PC IP:5005
 
 **Servo Timing:**
 
 ```python
-pulse = int(500 + (angle / 180) * 2000)  # 500μs–2500μs range
-# Sends 3 pulses per command with 20ms spacing for reliability
+pulse_us = 500 + (angle / 180.0) * 2000   # 500μs–2500μs
+pwm.duty_ns(int(pulse_us * 1000))         # 50Hz frame from the LEDC peripheral
 ```
+
+The frame is emitted by hardware, so it keeps running after the servo reaches
+its target — that is what gives it holding torque when idle. It must **not** be
+replaced by repeated one-shot pulses: three 1500μs pulses back to back is 4500μs
+of continuous HIGH, roughly 3x what a hobby servo accepts.
 
 #### Acceleration Live Recorder — Data Logging Mode
 
@@ -99,7 +115,7 @@ Client/
 - Keyboard input via left/right arrow keys (`STEER_STEP = 2°`)
 - Angle clamped to 0–180 range
 - Only sends when angle changes (optimizes network traffic)
-- Sends `S,<angle>` to CAR_ADDR:5006
+- Sends `S,<angle>` to CAR_ADDR:5005
 
 #### Widget Rendering
 
@@ -115,7 +131,7 @@ Client/
 
 1. User presses ←/→ key on PC keyboard
 2. `input.py` calculates new angle, clamps to [0,180]
-3. `network.py` sends `S,<angle>` via UDP to ESP32 IP:5006
+3. `network.py` sends `S,<angle>` via UDP to ESP32 IP:5005
 4. ESP32 receives command, calls `servo.set_angle(angle)`
 5. Servo writes PWM pulse (500μs–2500μs) based on angle
 
@@ -168,6 +184,9 @@ The architecture is designed for future growth — here are the planned extensio
 
 ## Known Issues / TODOs
 
-1. **Motor controller not working** — i'm planning to fix this
-2. **WiFi IP hardcoded** as `192.168.1.8` — should be configurable or auto-discovered
-3. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller
+1. **Motor not yet tested on the bench** — the failsafe and the 500Hz dual-PWM
+   path are in the firmware, but the whole change is unverified on hardware
+2. **Servo on GPIO3 has never been driven** — the pin is wired and the firmware
+   now steps it with the GPIO2 servo, but the mechanical result is untested
+3. **WiFi IP hardcoded** as `192.168.1.235` — should be configurable or auto-discovered
+4. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller
