@@ -42,7 +42,15 @@ version = 0.2
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy
+#
+# charset-normalizer is pinned to 2.1.1: Kivy 2.3.1 pulls in >=3.0.0, which
+# ships a compiled wheel. python-for-android installs requirements with
+# `pip --target` and picks up a cp314-android wheel that it cannot use:
+#   ERROR: charset_normalizer-3.5.1-cp314-cp314-android_24_arm64_v8a.whl
+#          is not a supported wheel on this platform.
+# 2.1.1 is pure-python, so it needs no recipe and builds cleanly.
+# See kivy/buildozer#2051, kivy/python-for-android#2755.
+requirements = python3,kivy,charset-normalizer==2.1.1
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
