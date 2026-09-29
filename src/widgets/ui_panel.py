@@ -15,6 +15,7 @@ from kivy.uix.textinput import TextInput as KTextInput
 from kivy.uix.label import Label as KLabel
 
 import network as net
+from ui_scale import scaled
 
 log = logging.getLogger(__name__)
 
@@ -27,37 +28,37 @@ class PanelUI(BoxLayout):
 
         self.orientation = "horizontal"
         self.size_hint_y = None
-        self.height = 60
+        self.height = scaled(60)
 
         # Labels for titles (replaced Button with Label — no event binding needed)
         car_ip_label = KLabel(
-            text="Car IP", font_size=14, size_hint_x=None, width=80
+            text="Car IP", font_size=scaled(14), size_hint_x=None, width=scaled(80)
         )
 
         phone_ip_label = KLabel(
-            text="Phone IP", font_size=14, size_hint_x=None, width=80
+            text="Phone IP", font_size=scaled(14), size_hint_x=None, width=scaled(80)
         )
 
         # Car IP input 
         self.car_ip_input = KTextInput(
-            text="192.168.1.226", multiline=False, size_hint_x=None, width=150,
-            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
+            text="192.168.1.226", multiline=False, size_hint_x=None, width=scaled(150),
+            font_size=scaled(14), background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
 
         # Phone IP input (placeholder, will be implemented later)
         self.phone_ip_input = KTextInput(
-            text="", multiline=False, size_hint_x=None, width=150,
-            font_size=14, background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
+            text="", multiline=False, size_hint_x=None, width=scaled(150),
+            font_size=scaled(14), background_color=(0.3, 0.3, 0.3), foreground_color=(1, 1, 1, 1)
         )
 
         # Status label for connection feedback
         self.status_label = KLabel(
-            text="", font_size=12, size_hint_x=5, width=80
+            text="", font_size=scaled(12), size_hint_x=5, width=scaled(80)
         )
 
         # Connect button
         self.connect_btn = KButton(
-            text="Save", font_size=14, size_hint_x=None, width=80,
+            text="Save", font_size=scaled(14), size_hint_x=None, width=scaled(80),
             background_color=(0.29, 0.76, 0.31, 1), color=(1, 1, 1, 1)
         )
 
@@ -106,13 +107,13 @@ class ZoomSlider(BoxLayout):
 
         self.orientation = "horizontal"
         self.size_hint_y = None
-        self.height = 30
+        self.height = scaled(30)
 
         label = KLabel(
-            text="Zoom", font_size=14, size_hint_x=None, width=50
+            text="Zoom", font_size=scaled(14), size_hint_x=None, width=scaled(50)
         )
 
-        self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=150)
+        self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=scaled(150))
 
         self.add_widget(label)
         self.add_widget(self.slider)
@@ -126,13 +127,13 @@ class QualitySlider(BoxLayout):
 
         self.orientation = "horizontal"
         self.size_hint_y = None
-        self.height = 30
+        self.height = scaled(30)
 
         label = KLabel(
-            text="Quality", font_size=14, size_hint_x=None, width=60
+            text="Quality", font_size=scaled(14), size_hint_x=None, width=scaled(60)
         )
 
-        self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=150)
+        self.slider = KSlider(min=0, max=1, value=0.5, size_hint_x=None, width=scaled(150))
 
         self.add_widget(label)
         self.add_widget(self.slider)

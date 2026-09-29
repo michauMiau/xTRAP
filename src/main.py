@@ -14,6 +14,7 @@ from kivy.uix.textinput import TextInput
 from state import state
 import network as net
 import settings
+from ui_scale import apply_density, scaled
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 from input import setup_button_bindings, setup_joystick, release_throttle, release_steer, cleanup_joystick
@@ -29,7 +30,7 @@ class StatusPanel(BoxLayout):
 
         self.orientation = "horizontal"
         self.size_hint_y = None
-        self.height = 30
+        self.height = scaled(30)
 
         # Battery display
         self.battery = Battery()  # Use the Kivy Battery widget
@@ -37,9 +38,9 @@ class StatusPanel(BoxLayout):
         # G-meter text
         self.g_label = Label(
             text=f"G: {state.g:.2f} MAX: {state.max_g:.2f}",
-            font_size=18,
+            font_size=scaled(18),
             size_hint=(0.7, None),
-            height=30
+            height=scaled(30)
         )
 
         # Spacer between battery and G-meter
@@ -100,31 +101,34 @@ class SteeringPanel(BoxLayout):
         # Horizontal layout: [left_btn] [center_btn] [steer_display] [right_btn]
         self.orientation = "horizontal"
         self.size_hint_y = None
-        self.height = 60
+        self.height = scaled(60)
 
         # Left/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.left_btn = KButton(
-            text="<", font_size=32, size_hint_x=None, width=45,
+            text="<", font_size=scaled(32), size_hint_x=None,
+            width=scaled(45),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
         # Center steering button — returns steering to 90°
         self.center_btn = KButton(
-            text="|", font_size=32, size_hint_x=None, width=45,
+            text="|", font_size=scaled(32), size_hint_x=None,
+            width=scaled(45),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
         # Right/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.right_btn = KButton(
-            text=">", font_size=32, size_hint_x=None, width=45,
+            text=">", font_size=scaled(32), size_hint_x=None,
+            width=scaled(45),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
         # Steering display — centered between buttons
         self.steer_display = Label(
             text=f"Steering: {state.steer}°",
-            font_size=24,
-            size_hint_x=5, width=100
+            font_size=scaled(24),
+            size_hint_x=5, width=scaled(100)
         )
 
         self.add_widget(self.left_btn)
@@ -142,24 +146,26 @@ class ThrottlePanel(BoxLayout):
         # Horizontal layout: [reverse_btn] [throttle_display] [forward_btn]
         self.orientation = "horizontal"
         self.size_hint_y = None
-        self.height = 60
+        self.height = scaled(60)
 
         # Reverse/Brake button (left) - ASCII arrow <
         self.reverse_btn = KButton(
-            text="<", font_size=48, size_hint_x=None, width=60,
+            text="<", font_size=scaled(48), size_hint_x=None,
+            width=scaled(60),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
         # Throttle display
         self.throttle_display = Label(
             text=f"Throttle: {state.throttle}%",
-            font_size=24,
-            size_hint_x=5, width=100
+            font_size=scaled(24),
+            size_hint_x=5, width=scaled(100)
         )
 
         # Forward/Throttle button (right) - ASCII arrow >
         self.forward_btn = KButton(
-            text=">", font_size=48, size_hint_x=None, width=60,
+            text=">", font_size=scaled(48), size_hint_x=None,
+            width=scaled(60),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
@@ -200,11 +206,14 @@ class MainLayout(GridLayout):
 
 class RCControlCenterApp(App):
     """Main Kivy application — cross-platform RC control center"""
+
     def __init__(self):
         super().__init__()
 
-        # Responsive window size based on screen dimensions
-        Window.size = (min(800, Window.width), min(200, Window.height))
+        # Recompute the UI scale from the window size before the layout is
+        # built, and again on every resize/rotation.
+        apply_density()
+        Window.bind(size=lambda *_a: apply_density())
 
     def build(self):
         """Build the main layout — called by Kivy during initialization."""
