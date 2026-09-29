@@ -14,7 +14,7 @@ from kivy.uix.textinput import TextInput
 from state import state
 import network as net
 import settings
-from ui_scale import apply_density, scaled
+from ui_scale import apply_density, button_width, scaled
 from widgets.battery import Battery
 from widgets.ui_panel import PanelUI
 from input import setup_button_bindings, setup_joystick, release_throttle, release_steer, cleanup_joystick
@@ -106,21 +106,21 @@ class SteeringPanel(BoxLayout):
         # Left/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.left_btn = KButton(
             text="<", font_size=scaled(32), size_hint_x=None,
-            width=scaled(45),
+            width=button_width(0.16),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
         # Center steering button — returns steering to 90°
         self.center_btn = KButton(
             text="|", font_size=scaled(32), size_hint_x=None,
-            width=scaled(45),
+            width=button_width(0.16),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
         # Right/Right buttons for steering (touch/PC) - ASCII arrows < >
         self.right_btn = KButton(
             text=">", font_size=scaled(32), size_hint_x=None,
-            width=scaled(45),
+            width=button_width(0.16),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
@@ -128,7 +128,7 @@ class SteeringPanel(BoxLayout):
         self.steer_display = Label(
             text=f"Steering: {state.steer}°",
             font_size=scaled(24),
-            size_hint_x=5, width=scaled(100)
+            size_hint_x=5, width=button_width(0.32)
         )
 
         self.add_widget(self.left_btn)
@@ -151,7 +151,7 @@ class ThrottlePanel(BoxLayout):
         # Reverse/Brake button (left) - ASCII arrow <
         self.reverse_btn = KButton(
             text="<", font_size=scaled(48), size_hint_x=None,
-            width=scaled(60),
+            width=button_width(0.20),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
@@ -159,13 +159,13 @@ class ThrottlePanel(BoxLayout):
         self.throttle_display = Label(
             text=f"Throttle: {state.throttle}%",
             font_size=scaled(24),
-            size_hint_x=5, width=scaled(100)
+            size_hint_x=5, width=button_width(0.36)
         )
 
         # Forward/Throttle button (right) - ASCII arrow >
         self.forward_btn = KButton(
             text=">", font_size=scaled(48), size_hint_x=None,
-            width=scaled(60),
+            width=button_width(0.20),
             background_color=(0.25, 0.25, 0.25, 1), color=(1, 1, 1, 1)
         )
 
