@@ -37,12 +37,14 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        # p4a.branch = develop requires Python 3.14 — see buildozer.spec and
+        # https://buildozer.readthedocs.io/en/latest/installation/
+        python-version: '3.14'
     
     - name: Install Buildozer deps
       run: |
         sudo apt-get update && sudo apt-get install -y python3-dev build-essential git zip unzip libtool autoconf automake pkg-config libltdl-dev
-        pip install --user cython buildozer kivy pillow pyjnius requests aiohttp
+        pip install --user legacy-cgi setuptools "cython==0.29.34" buildozer kivy pillow pyjnius requests aiohttp
         export PATH="$HOME/.local/bin:$PATH"
     
     - name: Build APK
