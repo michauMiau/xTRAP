@@ -233,6 +233,11 @@ class RCControlCenterApp(App):
 
         net.network_loop()
 
+        # Tell the car our address, and keep repeating it: a firmware that
+        # boots after the app still learns where to send telemetry.
+        net.announce_car_addr()
+        Clock.schedule_interval(lambda _dt: net.announce_car_addr(), 5)
+
         # Setup joystick/gamepad support
         setup_joystick()
 

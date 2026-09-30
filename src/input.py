@@ -29,7 +29,7 @@ def set_throttle(level):
     # Handling if input is incorrect
     level = max(-100, min(100, level))  # Clamp to [-100, 100]
     state.throttle = level
-    net.send_throttle(int(level))
+    net.set_held_throttle(level)
 
 def release_steer():
     set_steer(center_steer)
