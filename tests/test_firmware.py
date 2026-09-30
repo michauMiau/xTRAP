@@ -156,6 +156,36 @@ def test_i2c_bus_pins_are_documented_as_8_9():
     assert re.search(r"collide", warning), "the consequence is not stated"
 
 
+def test_client_handshake_is_accepted():
+    """The client announces its IP with H,<ip>; the car has to latch it."""
+    assert 'parts[0] == "H"' in SOURCE
+    assert 'HOST_IP' in SOURCE
+
+    # A bare assignment inside the loop would create a loop-local that never
+    # reaches sock.sendto, so it must go through globals(). The lookup sits
+    # above the if, so search the surrounding block rather than inside it.
+    branch = SOURCE.split('parts[0] == "H"')[1].split('parts[0] == "S"')[0]
+    assert 'host["HOST_IP"]' in branch
+    assert 'globals()' in SOURCE[:SOURCE.index('parts[0] == "H"')], (
+        "the handshake writes a bare name; HOST_IP would stay at its startup value"
+    )
+
+
+def test_handshake_rejects_a_malformed_address():
+    """Junk must not latch, or telemetry goes nowhere."""
+    handshake = SOURCE.split('parts[0] == "H"')[1].split('parts[0] == "S"')[0]
+    assert "len(octets) == 4" in handshake
+    assert "isdigit" in handshake
+    assert "int(o) < 256" in handshake
+
+
+def test_host_ip_is_read_at_send_time():
+    """The send has to use the current value, not a value bound at startup."""
+    send = SOURCE.split('msg = f"B,{pct},0"')[1]
+    assert "HOST_IP" in send
+    assert "(HOST_IP, PORT)" in send
+
+
 # --- servo ------------------------------------------------------------------
 
 def test_servo_uses_50hz_hardware_pwm(fw):
@@ -206,6 +236,30 @@ def test_servo_has_no_back_to_back_pulse_loop():
 
     # The frame must be the LEDC peripheral's job.
     assert "duty_ns" in methods["_write"]
+
+
+def test_servo_has_no_signal_until_commanded(fw):
+    """Boot must not drive the steering.
+
+    __init__ used to call _write(90), so both servos got a live 1500us frame
+    the moment the firmware started and drove to the default angle with no
+    command ever sent. duty stays 0 until set_angle() arrives.
+    """
+    servo = fw["Servo"](2)
+    assert servo.pwm.duty_ns_value == 0, "servo is powered before any command"
+    assert servo.target is None
+
+
+def test_first_command_starts_the_frame(fw):
+    """A real command must still light the servo up — the fix is not silence."""
+    servo = fw["Servo"](2)
+    assert servo.pwm.duty_ns_value == 0
+
+    servo.set_angle(95)          # one step from the resting 90
+    servo._step()
+    assert servo.pwm.duty_ns_value > 0
+    assert servo.angle == 95
+    assert servo.pwm.pulse_us == pytest.approx(1555, abs=2)  # 500 + 95/180*2000
 
 
 def test_servo_keeps_emitting_after_arriving(fw):
@@ -302,6 +356,17 @@ def test_drive_command_refreshes_the_failsafe_timer():
     t_block = SOURCE.split('if parts[0] == "T"')[1].split("except Exception")[0]
     assert "last_drive_time = now" in t_block
     assert "motor.run(throttle)" in t_block
+
+
+def test_failsafe_stays_quiet_while_idle(fw):
+    """No throttle ever sent → no FAILSAFE message every second.
+
+    The condition used to fire on a bare timeout with no throttle check, so an
+    untouched car logged the failsafe once a second forever.
+    """
+    failsafe = SOURCE.split("--- FAILSAFE ---")[1]
+    assert "throttle != 0" in failsafe
+    assert "throttle = 0" in failsafe, "the motor is not marked as stopped"
 
 
 def test_failsafe_stops_the_motor():

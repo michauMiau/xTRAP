@@ -3,6 +3,7 @@ import socket
 import math
 import logging
 import threading
+from kivy.clock import Clock
 from state import state
 import settings
 
@@ -16,7 +17,64 @@ _car_addr_lock = threading.Lock()
 
 PORT_RECV = 5005
 
+# How often a held throttle is repeated. The firmware's failsafe threshold is
+# 1000ms, so this must stay well under it while costing almost nothing.
+KEEPALIVE_S = 0.25
+
 _recv_stop_event = threading.Event()
+
+# A steering/throttle command has a physical meaning only while the button is
+# held, so it is sent once on press. The firmware's failsafe would then fire
+# mid-hold, so the client repeats the current throttle on a slow timer — the
+# command is idempotent, and 4Hz is far below the firmware's 50Hz tick.
+_held_throttle = 0
+_keepalive_id = None
+
+
+def announce_car_addr():
+    """Tell the car our IP, so it can send telemetry back to us.
+
+    The car has our address hardcoded, which breaks the moment the PC's IP
+    changes. Sending it in every packet would be simpler, but the firmware
+    binds one socket for both directions. So: a one-line handshake the car
+    latches, plus a repeat while idle so a firmware that booted after the
+    client still learns it.
+    """
+    addr = get_car_addr()
+    msg = f"H,{addr[0]}"
+    try:
+        send_sock.sendto(msg.encode(), addr)
+    except Exception as e:
+        log.debug(f"[announce] failed: {e}")
+
+
+def set_held_throttle(level):
+    """Hold the throttle down: remember it and keep repeating it.
+
+    The firmware treats 1000ms without a T packet as a lost link and stops the
+    motor, so a single press is not enough — the command has to keep coming
+    while the button is down and stop the moment it is released.
+    """
+    global _held_throttle, _keepalive_id  # pylint: disable=global-statement
+    _held_throttle = level
+
+    if not level:
+        if _keepalive_id is not None:
+            _keepalive_id.cancel()
+            _keepalive_id = None
+        send_throttle(0)
+        return
+
+    send_throttle(level)
+    if _keepalive_id is None:
+        _keepalive_id = Clock.schedule_interval(
+            lambda _dt: send_throttle(_held_throttle), KEEPALIVE_S
+        )
+
+
+def clear_held_throttle():
+    """Drop any held throttle — used on pause, so the car does not keep driving."""
+    set_held_throttle(0)
 
 
 def get_car_addr():

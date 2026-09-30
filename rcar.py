@@ -89,13 +89,14 @@ class Servo:
     """
 
     def __init__(self, pin):
-        # 50Hz frame, duty 0 until the first command arrives.
+        # 50Hz frame, no duty until the first command arrives. A servo needs a
+        # frame to hold position, but it must not be given one it never asked
+        # for — that drives it to the default angle on boot.
         self.pwm = PWM(Pin(pin), freq=50, duty=0)
         self.angle = 90
         self.target = None
         self.speed = 5
         self._last_step_time = 0
-        self._write(90)
 
     def _write(self, angle):
         """Set the LEDC duty for `angle` — 500..2500us out of a 20ms frame."""
@@ -189,6 +190,9 @@ gc_collect_at = 0
 # When the motor was last commanded. A timestamp, not a sticky boolean —
 # a boolean would latch true after the first packet and disable the failsafe.
 last_drive_time = time.ticks_ms()
+# Last commanded throttle. 0 = nothing to stop, so the failsafe stays quiet
+# until the car is actually moving.
+throttle = 0
 
 
 def gc_collect():
@@ -224,6 +228,19 @@ while True:
 
         parts = msg.split(",")
 
+        # Written through globals() because a bare assignment inside this loop
+        # would create a loop-local and never reach sock.sendto below.
+        host = globals()
+
+        # Client address handshake. The client announces its IP so the car can
+        # send telemetry back without a hardcoded address; anything valid is
+        # latched, so a changed DHCP lease self-heals on the next announce.
+        if parts[0] == "H" and len(parts) > 1:
+            octets = parts[1].split(".")
+            if len(octets) == 4 and all(o.isdigit() and int(o) < 256 for o in octets):
+                host["HOST_IP"] = parts[1]
+                print("Host:", parts[1])
+
         if parts[0] == "S" and len(parts) > 1:
             angle = int(parts[1])
             servo.set_angle(angle)
@@ -239,11 +256,13 @@ while True:
         pass
 
     # --- FAILSAFE ---
-    # stop() runs on every tick past the threshold, not only the first: a T0
-    # may never arrive, and the motor has to stay off regardless. Refreshing
-    # the timestamp just rate-limits the message.
-    if time.ticks_diff(now, last_drive_time) > FAILSAFE_MS:
+    # Only when the car is actually moving. stop() runs on every tick past the
+    # threshold, not only the first: a T0 may never arrive, and the motor has
+    # to stay off regardless. Refreshing the timestamp just rate-limits the
+    # message.
+    if throttle != 0 and time.ticks_diff(now, last_drive_time) > FAILSAFE_MS:
         motor.stop()
+        throttle = 0
         last_drive_time = now
         print("FAILSAFE: no drive command for", FAILSAFE_MS, "ms — motor stopped")
 
