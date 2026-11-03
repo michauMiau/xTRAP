@@ -99,8 +99,12 @@ class Servo:
         self._last_step_time = 0
 
     def _write(self, angle):
-        """Set the LEDC duty for `angle` — 500..2500us out of a 20ms frame."""
-        pulse_us = 500 + (angle / 180.0) * 2000
+        """Set the LEDC duty for `angle` — 1000..2000us out of a 20ms frame.
+        Standard hobby servos treat 1ms as one end of travel and 2ms as the
+        other; the old 500..2500 mapping pushed pulses beyond both ends, so
+        the servos buzzed and clicked at the extremes.
+        """
+        pulse_us = 1000 + (angle / 180.0) * 1000
         self.pwm.duty_ns(int(pulse_us * 1000))
         self.angle = angle
 
