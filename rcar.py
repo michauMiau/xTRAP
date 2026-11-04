@@ -95,12 +95,21 @@ class Servo:
         self.pwm = PWM(Pin(pin), freq=50, duty=0)
         self.angle = 90
         self.target = None
-        self.speed = 5
+        # Degrees per main-loop tick (20ms). At 5 it slewed ~250 deg/s, which
+        # pulled enough stall current through the steering linkage to sag the
+        # battery rail and reset the ESP32 while sweeping. 2 keeps the slew
+        # inside ~100 deg/s — slower than the servo's rated speed, so the
+        # motor pulses stay brief and the rail holds.
+        self.speed = 2
         self._last_step_time = 0
 
     def _write(self, angle):
-        """Set the LEDC duty for `angle` — 500..2500us out of a 20ms frame."""
-        pulse_us = 500 + (angle / 180.0) * 2000
+        """Set the LEDC duty for `angle` — 1000..2000us out of a 20ms frame.
+        Standard hobby servos treat 1ms as one end of travel and 2ms as the
+        other; the old 500..2500 mapping pushed pulses beyond both ends, so
+        the servos buzzed and clicked at the extremes.
+        """
+        pulse_us = 1000 + (angle / 180.0) * 1000
         self.pwm.duty_ns(int(pulse_us * 1000))
         self.angle = angle
 
