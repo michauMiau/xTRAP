@@ -95,7 +95,12 @@ class Servo:
         self.pwm = PWM(Pin(pin), freq=50, duty=0)
         self.angle = 90
         self.target = None
-        self.speed = 5
+        # Degrees per main-loop tick (20ms). At 5 it slewed ~250 deg/s, which
+        # pulled enough stall current through the steering linkage to sag the
+        # battery rail and reset the ESP32 while sweeping. 2 keeps the slew
+        # inside ~100 deg/s — slower than the servo's rated speed, so the
+        # motor pulses stay brief and the rail holds.
+        self.speed = 2
         self._last_step_time = 0
 
     def _write(self, angle):
