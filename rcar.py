@@ -95,6 +95,7 @@ class Servo:
         self.pwm = PWM(Pin(pin), freq=50, duty=0)
         self.angle = 90
         self.target = None
+        self.holding = False
         # Degrees per main-loop tick (20ms). At 5 it slewed ~250 deg/s, which
         # pulled enough stall current through the steering linkage to sag the
         # battery rail and reset the ESP32 while sweeping. 2 keeps the slew
@@ -112,6 +113,17 @@ class Servo:
         pulse_us = 1000 + (angle / 180.0) * 1000
         self.pwm.duty_ns(int(pulse_us * 1000))
         self.angle = angle
+        self.holding = True
+
+    def release(self):
+        """Put the servo to sleep: drop the PWM frame so it draws no hold
+        current and the wheels settle to their linkage rest position. The next
+        set_angle() turns the frame back on, so steering works after a release
+        the same as after boot. Use it when the robot is parked and the wheels
+        should stay parallel without draining the battery on hold torque."""
+        self.pwm.duty(0)
+        self.target = None
+        self.holding = False
 
     def _step(self):
         """Advance one step. Kept for the main loop's 20ms tick."""
@@ -134,7 +146,16 @@ class Servo:
     def set_angle(self, angle):
         """Schedule smooth move to `angle` — returns immediately."""
         angle = max(0, min(180, int(angle)))
-        if self.angle == angle:
+        # If already holding this angle, nothing to do. After a release the
+        # servo is asleep, so the same angle must still wake it up.
+        if self.angle == angle and self.holding:
+            return
+        # Waking from sleep: write the commanded pulse right away (stepping is
+        # a no-op when the angle is unchanged, which would leave it asleep).
+        if not self.holding:
+            self._write(angle)
+            self.target = None
+            print("S" + str(angle))
             return
         self.target = angle
         print("S" + str(angle))
@@ -254,6 +275,14 @@ while True:
             angle = int(parts[1])
             servo.set_angle(angle)
             servo_2.set_angle(angle)
+
+        # X command: release both steering servos (no frame, no hold current,
+        # wheels settle). Stops holding position so a parked robot draws no
+        # steering current and the wheels settle parallel; S turns them back on.
+        if parts[0] == "X":
+            servo.release()
+            servo_2.release()
+            print("X release")
 
         # T command: set throttle once, hold state until next T packet (T0 stops motor)
         if parts[0] == "T" and len(parts) > 1:
