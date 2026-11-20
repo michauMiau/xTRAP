@@ -324,6 +324,16 @@ PAGE_PATH, PAGE_BYTES = find_page()
 PAGE_OK = PAGE_PATH is not None
 
 
+def decode_text(data):
+    """Bytes to text without the errors keyword — MicroPython's decode takes
+    no keyword arguments (its own source says 'TODO: should accept kwargs
+    too'), so passing errors there raises TypeError on the device."""
+    try:
+        return data.decode("utf-8")
+    except Exception:
+        return data.decode("latin-1")
+
+
 def read_page():
     if PAGE_BYTES is not None:
         return PAGE_BYTES
@@ -469,7 +479,7 @@ def draw():
 
     warn = last_error or ("" if PAGE_OK else "WEBUI MISSING")
     hint = "ENT rel  SPC stop"
-    DISPLAY.text("ERR " + warn[:22] if warn else hint, 8, 118, warn_color())
+    DISPLAY.text(("ERR " + warn[:25]) if warn else hint, 8, 118, warn_color())
     DISPLAY.show()
 
 
@@ -507,7 +517,7 @@ def _serve_client(ev):
         if b"\r\n\r\n" not in client_buf:
             return
         head, client_buf = client_buf.split(b"\r\n\r\n", 1)
-        lines = head.decode(errors="replace").split("\r\n")
+        lines = decode_text(head).split("\r\n")
         request_line = lines[0] if lines else ""
         path = request_line.split(" ")[1] if " " in request_line else "/"
         key = None
@@ -540,7 +550,7 @@ def _serve_client(ev):
         elif opcode == 0x9:
             send_all(client, bytes([0x8A, len(payload)]) + payload)
         elif opcode == 0x1:
-            handle_text(payload.decode(errors="replace").strip())
+            handle_text(decode_text(payload).strip())
 
 
 print("Web control on http://%s/ (ws /ws)" % nic.ifconfig()[0])

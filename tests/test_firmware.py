@@ -114,7 +114,7 @@ def _load_from_source():
                 name = node.name
             elif isinstance(node, ast.Assign):
                 name = node.targets[0].id if isinstance(node.targets[0], ast.Name) else None
-            if name in ("Servo", "Motor", "send_all", "ws_accept", "ws_send", "ws_parse") or (
+            if name in ("Servo", "Motor", "send_all", "decode_text", "ws_accept", "ws_send", "ws_parse") or (
                 name and re.match(r"^(PINS|FAILSAFE_MS|WS_GUID)$", name)
             ):
                 keep.append(node)
@@ -433,6 +433,17 @@ def test_web_server_serves_the_page_and_ws():
     assert 'path == "/ws"' in SOURCE
     assert "Sec-WebSocket-Accept" in SOURCE
     assert (RCAR.parent / "www" / "index.html").exists()
+
+
+def test_no_decode_errors_kwarg():
+    """MicroPython's bytes.decode takes no keyword arguments."""
+    assert "decode(errors=" not in SOURCE
+    assert "encode(errors=" not in SOURCE
+
+
+def test_decode_text_handles_bad_utf8(fw):
+    assert fw["decode_text"](b"S,60") == "S,60"
+    assert fw["decode_text"](b"\xff\xfe") == "\xff\xfe"
 
 
 def test_ws_accept_matches_rfc6455_example(fw):
