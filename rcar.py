@@ -43,7 +43,9 @@ PINS = {
 FAILSAFE_MS = 1000
 
 PORT = 80
-PAGE_PATH = "/www/index.html"
+# The page can live on the internal flash (/www) or on the SD card (/sd/www),
+# depending on where it was copied.
+PAGE_PATHS = ("/www/index.html", "/sd/www/index.html")
 STATS_MS = 5000
 
 # --- MICROHYDRA UI ---
@@ -288,13 +290,37 @@ def ws_parse(buf):
 
 
 def read_page():
-    """The control page, served from the card. Falls back to a minimal page
-    if the file is missing so the robot is never a brick without its UI."""
-    try:
-        with open(PAGE_PATH, "rb") as f:
-            return f.read()
-    except Exception:
-        return b"<html><body><h1>xTRAP</h1><p>www/index.html not found</p></body></html>"
+    """The control page, served from the card or the SD card. Falls back to a
+    minimal page if neither is present so the robot is never a brick without
+    its UI."""
+    for path in PAGE_PATHS:
+        try:
+            with open(path, "rb") as f:
+                return f.read()
+        except Exception:
+            pass
+    return b"<html><body><h1>xTRAP</h1><p>index.html not found</p></body></html>"
+
+
+def send_all(sock, data):
+    """Send a whole buffer on a non-blocking socket.
+
+    socket.send() on a non-blocking socket raises as soon as the buffer is
+    full, which is exactly what happens when a browser pulls the 4KB page.
+    Retry with a short sleep, and give up after a second so a dead client
+    cannot hang the main loop.
+    """
+    view = memoryview(data)
+    tries = 0
+    while view:
+        try:
+            sent = sock.send(view)
+            view = view[sent:]
+        except OSError:
+            tries += 1
+            if tries > 200:
+                raise
+            time.sleep_ms(5)
 
 
 def send_page(cli):
@@ -303,7 +329,7 @@ def send_page(cli):
             "Content-Type: text/html; charset=utf-8\r\n"
             "Content-Length: %d\r\n"
             "Connection: close\r\n\r\n" % len(body))
-    cli.send(head.encode() + body)
+    send_all(cli, head.encode() + body)
 
 
 connect_wifi()
@@ -402,6 +428,65 @@ def draw():
     DISPLAY.show()
 
 
+def _serve_client(ev):
+    """Handle one poll event on the connected client.
+
+    Split out so the main loop can wrap it: a browser that vanishes
+    mid-response must drop the client, not crash the app.
+    """
+    global client_buf, client_ws
+    if ev & (select.POLLHUP | select.POLLERR):
+        drop_client()
+        return
+    try:
+        data = client.recv(512)
+    except Exception:
+        data = b""
+    if not data:
+        drop_client()
+        return
+    client_buf += data
+
+    if not client_ws:
+        if b"\r\n\r\n" not in client_buf:
+            return
+        head, client_buf = client_buf.split(b"\r\n\r\n", 1)
+        lines = head.decode(errors="replace").split("\r\n")
+        request_line = lines[0] if lines else ""
+        path = request_line.split(" ")[1] if " " in request_line else "/"
+        key = None
+        for line in lines[1:]:
+            name, _, value = line.partition(":")
+            if name.strip().lower() == "sec-websocket-key":
+                key = value.strip()
+        if path == "/ws" and key:
+            resp = ("HTTP/1.1 101 Switching Protocols\r\n"
+                    "Upgrade: websocket\r\n"
+                    "Connection: Upgrade\r\n"
+                    "Sec-WebSocket-Accept: %s\r\n\r\n" % ws_accept(key))
+            send_all(client, resp.encode())
+            client_ws = True
+            print("WebSocket up")
+        else:
+            send_page(client)
+            drop_client()
+        return
+
+    while True:
+        frame = ws_parse(client_buf)
+        if frame is None:
+            break
+        opcode, payload, used = frame
+        client_buf = client_buf[used:]
+        if opcode == 0x8:
+            drop_client()
+            break
+        elif opcode == 0x9:
+            send_all(client, bytes([0x8A, len(payload)]) + payload)
+        elif opcode == 0x1:
+            handle_text(payload.decode(errors="replace").strip())
+
+
 print("Web control on http://%s/ (ws /ws)" % nic.ifconfig()[0])
 
 while True:
@@ -465,59 +550,14 @@ while True:
 
         if sock is not client:
             continue
-        if ev & (select.POLLHUP | select.POLLERR):
-            drop_client()
-            dirty = True
-            continue
         try:
-            data = client.recv(512)
-        except Exception:
-            data = b""
-        if not data:
+            _serve_client(ev)
+        except Exception as exc:
+            # A browser that vanishes mid-response must not take the app down;
+            # MicroHydra catches an uncaught exception by dropping to the launcher.
+            print("client error:", exc)
             drop_client()
             dirty = True
-            continue
-        client_buf += data
-
-        if not client_ws:
-            if b"\r\n\r\n" not in client_buf:
-                continue
-            head, client_buf = client_buf.split(b"\r\n\r\n", 1)
-            lines = head.decode(errors="replace").split("\r\n")
-            request_line = lines[0] if lines else ""
-            path = request_line.split(" ")[1] if " " in request_line else "/"
-            key = None
-            for line in lines[1:]:
-                name, _, value = line.partition(":")
-                if name.strip().lower() == "sec-websocket-key":
-                    key = value.strip()
-            if path == "/ws" and key:
-                resp = ("HTTP/1.1 101 Switching Protocols\r\n"
-                        "Upgrade: websocket\r\n"
-                        "Connection: Upgrade\r\n"
-                        "Sec-WebSocket-Accept: %s\r\n\r\n" % ws_accept(key))
-                client.send(resp.encode())
-                client_ws = True
-                print("WebSocket up")
-            else:
-                send_page(client)
-                drop_client()
-            continue
-
-        while True:
-            frame = ws_parse(client_buf)
-            if frame is None:
-                break
-            opcode, payload, used = frame
-            client_buf = client_buf[used:]
-            if opcode == 0x8:
-                drop_client()
-                break
-            elif opcode == 0x9:
-                hdr = bytearray([0x8A, len(payload)])
-                client.send(bytes(hdr) + payload)
-            elif opcode == 0x1:
-                handle_text(payload.decode(errors="replace").strip())
 
     # --- TELEMETRY ---
     if client is not None and client_ws and time.ticks_diff(now, last_stats) > STATS_MS:
