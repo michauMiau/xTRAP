@@ -2,36 +2,35 @@
 
 ## Overview
 
-xTRAP (eXtensible Robotic Technic Automation Platform) is a modular, remote-controlled robot built from LEGO Technic. The system uses an ESP32 board mounted on a Cardputer handheld device with Micropython firmware as the robot's brain. A Pygame desktop application serves as the control center, providing real-time sensor visualization and steering input via keyboard or joystick.
+xTRAP (eXtensible Robotic Technic Automation Platform) is a modular, remote-controlled robot built from LEGO Technic. An ESP32 on a Cardputer runs MicroPython firmware as the robot's brain, and hosts the control interface itself: a browser page plus a WebSocket. Any phone or laptop on the same WiFi opens `http://<car-ip>/` and drives.
 
 ## System Diagram
 
 ```text
-┌──────────────┐           UDP          ┌─────────────────┐
-│              │  S,<angle> ←──────────→ │                 │
-│   Cardputer  │                        │    PC Client    │
-│              │  B,pct →────────────── │  (Pygame)       │
-│  + ESP32     │                        │ Orientation     │
-│  + Battery   │                        │ Battery         │
-│  + Servo     │                        │ Steering Input  │
-└──────────────┘                        └─────────────────┘
+┌──────────────┐        WiFi (HTTP + WebSocket)      ┌─────────────────┐
+│              │  GET /  ───────────────────────────→ │                 │
+│   Cardputer  │                                    │  Browser client │
+│              │  ws /ws  S,<angle> / T,<throttle>   │  (phone/PC)     │
+│  + ESP32     │  ←───────────────────────────────→ │                 │
+│  + Battery   │           B,pct (5s)                │ steering slider │
+│  + Servo ×2  │                                    │ throttle slider │
+│  + Motor     │                                    │ release button  │
+└──────────────┘                                    └─────────────────┘
 ```
 
 ## Components
 
 ### 1. Robot — ESP32 Firmware (Cardputer)
 
-The robot runs Micropython on an ESP32/LeafLabs board mounted inside the Cardputer. Two firmware variants exist:
-
 #### rcar.py — Main Control Firmware
 
 **Responsibilities:**
 
 - WiFi connection management (`Config` class for SSID/password)
-- Steering command reception and servo actuation
-- Battery level telemetry broadcast via UDP
-
-> **Note:** IMU (accelerometer) data sending is currently disabled to prevent feature creep. The robot only sends battery level over UDP. Accelerometer logging is available locally on the Cardputer's SD card.
+- HTTP server: `GET /` serves `www/index.html`, any other path serves the same page
+- WebSocket endpoint `/ws`: commands in, battery telemetry out
+- Steering command handling and servo actuation (both servos in lockstep)
+- Motor failsafe
 
 **Key Modules:**
 
@@ -49,27 +48,25 @@ The robot runs Micropython on an ESP32/LeafLabs board mounted inside the Cardput
 All of these are declared once in the `PINS` dict at the top of `rcar.py`; the
 driver classes read from it, so there are no bare GPIO numbers left in the code.
 
-**Motor failsafe:** if no `T,<throttle>` command arrives within `FAILSAFE_MS`
-(1000ms), the firmware calls `motor.stop()`. Without it a `T,100` latched
-forever and a dropped WiFi link left the car at full throttle. The check is a
-plain `time.ticks_diff` comparison against a timestamp, never a sticky flag.
+**Main loop:** one 20ms tick drives the servo step gate, the failsafe check, garbage collection and the socket poll. The HTTP handshake and WebSocket frames are parsed from the poll events, so nothing blocks the loop.
 
-**Network Protocol:**
+**Motor failsafe:** if no `T,<throttle>` command arrives within `FAILSAFE_MS` (1000ms), the firmware calls `motor.stop()`. Without it a `T,100` latched forever and a dropped WiFi link left the car at full throttle. The check is a plain `time.ticks_diff` comparison against a timestamp, never a sticky flag.
 
-- **Inbound (polling):** Listens on port 5005 for `S,<angle>` and `T,<throttle>`
-- **Outbound (every ~5s):** `B,pct,0` battery percentage sent via UDP to PC IP:5005
+**Network Protocol (WebSocket, text frames):**
+
+- **Inbound:** `S,<angle>` (0–180, both servos), `T,<throttle>` (−100…100), `X` (release servos)
+- **Outbound (every 5s):** `B,pct` battery percentage
 
 **Servo Timing:**
 
 ```python
-pulse_us = 500 + (angle / 180.0) * 2000   # 500μs–2500μs
-pwm.duty_ns(int(pulse_us * 1000))         # 50Hz frame from the LEDC peripheral
+pulse_us = 1000 + (angle / 180.0) * 1000   # 1000μs–2000μs
+pwm.duty_ns(int(pulse_us * 1000))          # 50Hz frame from the LEDC peripheral
 ```
 
-The frame is emitted by hardware, so it keeps running after the servo reaches
-its target — that is what gives it holding torque when idle. It must **not** be
-replaced by repeated one-shot pulses: three 1500μs pulses back to back is 4500μs
-of continuous HIGH, roughly 3x what a hobby servo accepts.
+The frame is emitted by hardware, so it keeps running after the servo reaches its target — that is what gives it holding torque when idle. It must **not** be replaced by repeated one-shot pulses, and the pulse must stay inside the 1ms..2ms window hobby servos accept. `X` drops the frame (duty 0) so a parked robot draws no hold current; the next `S` writes the pulse again.
+
+The slew is 2° per 20ms tick (~100°/s), below the servo's rated speed, because faster slews pulled enough stall current through the steering linkage to sag the battery rail and reset the ESP32.
 
 #### Acceleration Live Recorder — Data Logging Mode
 
@@ -81,112 +78,40 @@ A standalone Cardputer app that logs accelerometer data to SD card (used when IM
 - Records: timestamp_ms, ax, ay, az, g_total, event_type
 - Crash detection via G-force threshold (`ACCIDENT_THRESHOLD`, currently undefined — needs to be set)
 
-### 2. Client — Pygame Desktop Application
+### 2. Client — Browser Page (`www/index.html`)
 
-A Pygame-based control center running on the PC. It connects to the robot via UDP and provides visualization + input handling.
-
-#### Directory Structure
-
-```text
-Client/
-├── main.py          # Entry point, event loop, widget rendering
-├── state.py         # Shared mutable state (sensors, battery)
-├── network.py       # UDP communication layer
-├── input.py         # Keyboard/joystick steering input
-├── rcar.py          # Robot firmware source code for reference
-└── widgets/
-    ├── g_meter.py   # Circular G-force visualization
-    ├── orientation.py # Roll/pitch angle display
-    ├── battery.py    # Battery level text (car + phone)
-    └── ui_panel.py  # UI panel for controls/info
-```
-
-#### Communication Flow
-
-**Receiving Telemetry (network_loop thread):**
-
-1. Binds to UDP port 5005, drains buffer continuously
-2. Parses messages: `B,pct` → update battery state
-
-> **Note:** The client currently receives only battery percentage telemetry. IMU data (`M,ax,ay,az`) sending from the robot is disabled in rcar.py — accelerometer visualization widgets (G-meter, orientation) will show zeros until IMU telemetry is re-enabled.
-
-**Sending Steering Commands:**
-
-- Keyboard input via left/right arrow keys (`STEER_STEP = 2°`)
-- Angle clamped to 0–180 range
-- Only sends when angle changes (optimizes network traffic)
-- Sends `S,<angle>` to CAR_ADDR:5005
-
-#### Widget Rendering
-
-| Widget | Function |
-| ------ | -------- |
-| GMeter | Red dot moving within circle, scaled by ax/ay normalized to G-force (currently shows zeros — IMU data disabled) |
-| Orientation | Shows roll/pitch angle derived from accelerometer data (currently shows zeros — IMU data disabled) |
-| BatteryText | Displays car battery %, low-battery warning in red (<20%) |
+A single self-contained page served by the car: steering slider, throttle slider, release button, battery readout and a connection indicator. It connects to `ws://<car-ip>/ws`, sends `S,`/`T,` on input and `X` on the release button, and renders `B,` telemetry. Arrow keys steer and set throttle on desktop.
 
 ## Data Flow
 
 ### Steering (User → Robot)
 
-1. User presses ←/→ key on PC keyboard
-2. `input.py` calculates new angle, clamps to [0,180]
-3. `network.py` sends `S,<angle>` via UDP to ESP32 IP:5005
-4. ESP32 receives command, calls `servo.set_angle(angle)`
-5. Servo writes PWM pulse (500μs–2500μs) based on angle
+1. User drags the steering slider (or presses ←/→)
+2. Page sends `S,<angle>` over the WebSocket
+3. Firmware calls `servo.set_angle(angle)` and `servo_2.set_angle(angle)`
+4. Servo writes the PWM pulse (1000μs–2000μs) and slews 2° per tick
 
-### Telemetry (Robot → User) — Currently Disabled
+### Battery (Robot → User)
 
-1. Robot reads accelerometer: `ax, ay, az = imu.acceleration`
-2. **This is currently disabled** — commented out in rcar.py to prevent feature creep
-3. When re-enabled: would send UDP packet `M,{ax},{ay},{az}` to PC IP:5005
-
-### Battery Level (Robot → User)
-
-1. ESP32 reads battery percentage every ~5s: `batt.read_pct()`
-2. Sends UDP packet: `B,{pct},0` to PC IP:5005
-3. Client updates state.batt_pct, battery widget displays with color coding (red if <20%)
+1. Firmware reads `batt.read_pct()` every 5s
+2. Sends `B,<pct>` over the WebSocket
+3. Page updates the battery readout
 
 ### Local Accelerometer Logging (Robot → SD Card)
 
-1. Flash Acceleration live recorder.py firmware on Cardputer
+1. Flash the Acceleration live recorder firmware on Cardputer
 2. Press ENT to start recording — creates `blackbox_NNN.csv` on `/sd/`
 3. Records timestamp, accelerometer data, G-force, and crash events locally
 
 ## Extensibility Points
 
-The architecture is designed for future growth — here are the planned extension points:
-
-### 1. Re-enable IMU Telemetry
-
-- Uncomment accelerometer sending in rcar.py (currently disabled)
-- Client will receive `M,ax,ay,az` packets again
-- G-meter and orientation widgets become functional
-
-### 2. Video Streaming
-
-- A separate phone streaming video to the computer
-- Client uses another program (like mpv/vlc) to display video
-- Currently planned but not implemented
-
-### 3. Force Feedback Steering Wheel
-
-- Accelerometer-based force feedback from wheel rotation sensor
-- ESP32 reads encoder/IMU on steering wheel, sends `F,<force>` to PC client
-- Client drives USB force feedback device (e.g., Logitech G29 via HID)
-- Provides realistic resistance during steering
-
-### 4. Plugin Architecture
-
-- `Client/widgets/` — modular widget system, each feature adds a new widget class
-- `rcar.py` — command parsing can be extended with new message types (`E,<cmd>`, `M2,<motor_data>`)
-- Designed for future sensors (distance sensors, cameras, etc.)
+1. **IMU telemetry** — send `M,ax,ay,az` frames alongside `B,pct`; the page can render a G-meter
+2. **Video streaming** — a separate phone streams video; the page can embed it
+3. **Force feedback** — a wheel client sends `F,<force>`; the firmware can map it to steering
+4. **New commands** — `handle_text()` is the single place a frame becomes an action
 
 ## Known Issues / TODOs
 
-1. **Motor not yet tested on the bench** — the failsafe and the 500Hz dual-PWM
-   path are in the firmware, but the whole change is unverified on hardware
-2. **Servo on GPIO3 has never been driven** — the pin is wired and the firmware
-   now steps it with the GPIO2 servo, but the mechanical result is untested
-3. **WiFi IP hardcoded** as `192.168.1.235` — should be configurable or auto-discovered
-4. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller
+1. **Servo on GPIO3 has never been driven on the bench** — the pin is wired and the firmware steps it with the GPIO2 servo, but the mechanical result is unverified
+2. **Brakes not implemented** — needs mechanical brake solution or regen braking via motor controller
+3. **Single client** — a second browser replaces the first; no multi-operator support

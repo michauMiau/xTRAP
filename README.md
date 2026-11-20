@@ -1,68 +1,68 @@
 # xTRAP — eXtensible Robotic Technic Automation Platform
 
-Remote-controlled driving robot built from Technic (but yours doesn't have to be), powered by Micropython on a Cardputer (ESP32) with real-time sensor feedback and steering control.
+Remote-controlled driving robot built from Technic (but yours doesn't have to be), powered by MicroPython on a Cardputer (ESP32) with real-time sensor feedback and steering control.
 
 ## Architecture
 
-- **RCAR** — ESP32 + BMI270 accelerometer + servo for steering + motor controller
-- **Client** — Pygame desktop app that displays G-meter, orientation, battery levels and sends steering commands via UDP
+- **RCAR** — ESP32 + BMI270 accelerometer + 2 steering servos + MX1508 motor controller. It joins WiFi and runs a small web server on the car itself.
+- **Client** — a browser page served by the car. Open `http://<car-ip>/` on a phone or laptop and you get the controls; commands and telemetry ride one WebSocket (`/ws`). No app to install, no UDP port, no client build.
+
+The old UDP + Kivy client version is preserved on the [`legacy/udp-rcar`](https://github.com/michauMiau/xTRAP/tree/legacy/udp-rcar) branch.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.10+ with Pygame (`pip install kivy`)
-- GL libraries for Kivy
-- Cardputer board flashed with MicroHydra
-- WiFi connection between the Cardputer and PC
+- Cardputer flashed with MicroHydra
+- `rcar.py` and `www/index.html` uploaded to the card
+- WiFi credentials in the MicroHydra config (`wifi_ssid`, `wifi_pass`)
 
-The client sends commands to the robot on port 5005 (the firmware binds the same port for both directions) and receives telemetry on the same socket.
+### Running
 
-### Running on the Cardputeer
+The firmware boots, joins WiFi and prints its address:
 
-- `rcar.py` — main firmware: receives `S`/`T` commands over UDP, drives both
-  steering servos (GPIO2 + GPIO3, in lockstep) and the MX1508 motor
-  (GPIO6/GPIO4), and sends battery telemetry. Stops the motor if no throttle
-  command arrives for 1000ms.
+```
+Connected: ('192.168.1.225', '255.255.255.0', ...)
+Web control on http://192.168.1.225/ (ws /ws)
+```
+
+Open that address in a browser. The page has a steering slider, a throttle slider and a release button; arrow keys work on desktop. Battery telemetry arrives over the same WebSocket every 5s.
 
 ## Hardware
 
 | Component | Purpose |
 | --------- | ------- |
-| ESP32 / Micropython | Main controller on Cardputer |
+| ESP32 / MicroPython | Main controller on Cardputer |
 | BMI270 (I²C) | 6-DoF accelerometer/gyro for orientation + G-force detection |
 | Servo ×2 | Steering — GPIO2 and GPIO3, driven in lockstep (the linkage connects them) |
-| Motor controller | Drives motor for movement |
+| Motor controller | MX1508 on GPIO6/GPIO4, 500Hz PWM |
 
-## Network Protocol
+## Protocol
 
-All communication is over raw UDP:
-- **Client → ESP32**: `S,<angle>` — steering command (0–180 degrees), port 5005
-- **Client → ESP32**: `T,<throttle>` — throttle −100…100, port 5005. The motor stops on its own if no `T` arrives for 1000ms
-- **ESP32 → Client**: `M,ax,ay,az` — accelerometer data, port 5005
-- **ESP32 → Client**: `B,pct` — battery percentage (sent every ~10s), port 5005
+One WebSocket at `ws://<car-ip>/ws`, text frames:
+
+- **Browser → car**: `S,<angle>` — steering 0–180 degrees, both servos in lockstep
+- **Browser → car**: `T,<throttle>` — throttle −100…100. The motor stops on its own if no `T` arrives for 1000ms
+- **Browser → car**: `X` — release both steering servos: the PWM frame drops, the servos draw no hold current and the wheels settle. Any `S` wakes them again
+- **Car → browser**: `B,pct` — battery percentage every 5s
+
+`GET /` serves the control page; any other path gets the same page.
 
 ## Features
 
-### Current ✅
+### Current
 
-- Real-time G-meter visualization on PC client
-- Steering control via keyboard (←/→ arrows)
-- Battery level display on both Cardputer and PC client
-- Orientation widget showing roll/pitch angle
+- Browser remote with steering, throttle and servo release
+- Battery telemetry over WebSocket
+- Failsafe motor stop when the link goes quiet
+- Servo pulses kept inside the 1ms..2ms window hobby servos accept
 
-### In Progress 🚧
+### Feature Creep
 
-- Motor acceleration
-- Brakes implementation (set throttle to 0 or slight reverse?)
-
-### Feature Creep 📋
-
-- Live video streaming from a Phone
+- Live video streaming from a phone
 - Force feedback steering wheel support (accelerometer-based)
 - Headlight LED on Cardputer
-- Controlling the video streaming phone
-  
+
 ## Contributing
 
 Contributions welcome!

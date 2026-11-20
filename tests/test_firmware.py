@@ -2,8 +2,8 @@
 
 The firmware cannot be imported directly: it opens WiFi, binds a socket and
 runs `while True` at module level. So this harness stubs the machine module,
-extracts the PINS/FAILSAFE constants and the Servo class from the real source,
-and executes them. What is tested is the code in rcar.py, not a copy of it.
+extracts the constants, classes and pure functions from the real source, and
+executes them. What is tested is the code in rcar.py, not a copy of it.
 """
 
 import ast
@@ -64,6 +64,17 @@ class FakePin:
         self.state = False
 
 
+class FakeSocket:
+    """Captures what the firmware writes to a socket."""
+
+    def __init__(self):
+        self.sent = b""
+
+    def send(self, data):
+        self.sent += data
+        return len(data)
+
+
 def _machine_stub():
     mod = types.ModuleType("machine")
     mod.Pin = FakePin
@@ -72,32 +83,46 @@ def _machine_stub():
     return mod
 
 
-def _load_from_source():
-    """Execute only the parts of rcar.py that are testable, in a sandbox.
+def _exec_nodes(nodes, sandbox):
+    exec(  # pylint: disable=exec-used
+        compile(ast.Module(body=nodes, type_ignores=[]), str(RCAR), "exec"), sandbox
+    )
 
-    Takes the PINS/FAILSAFE assignment, the Servo class and the Motor class
-    straight out of the file, so these tests cannot drift from the firmware.
+
+def _load_from_source():
+    """Execute the testable parts of rcar.py in a sandbox.
+
+    Takes PINS/FAILSAFE, the Servo and Motor classes, and the pure websocket
+    helpers straight out of the file, so these tests cannot drift from the
+    firmware.
     """
     tree = ast.parse(SOURCE)
     keep = []
     for node in tree.body:
-        if isinstance(node, (ast.ClassDef, ast.Assign)):
+        if isinstance(node, (ast.ClassDef, ast.Assign, ast.FunctionDef)):
             name = None
             if isinstance(node, ast.ClassDef):
                 name = node.name
+            elif isinstance(node, ast.FunctionDef):
+                name = node.name
             elif isinstance(node, ast.Assign):
                 name = node.targets[0].id if isinstance(node.targets[0], ast.Name) else None
-            if name in ("Servo", "Motor") or (
-                name and re.match(r"^(PINS|FAILSAFE_MS|SERVO_\w+)$", name)
+            if name in ("Servo", "Motor", "ws_accept", "ws_send", "ws_parse") or (
+                name and re.match(r"^(PINS|FAILSAFE_MS|WS_GUID)$", name)
             ):
                 keep.append(node)
 
-    assert len(keep) >= 4, f"expected Servo/Motor/PINS/FAILSAFE, got {[type(n).__name__ for n in keep]}"
+    assert len(keep) >= 6, f"expected the firmware pieces, got {[type(n).__name__ for n in keep]}"
 
-    sandbox = {"Pin": FakePin, "PWM": FakePWM, "__name__": "rcar_under_test"}
-    exec(  # pylint: disable=exec-used
-        compile(ast.Module(body=keep, type_ignores=[]), str(RCAR), "exec"), sandbox
-    )
+    sandbox = {
+        "Pin": FakePin,
+        "PWM": FakePWM,
+        "__name__": "rcar_under_test",
+        "hashlib": __import__("hashlib"),
+        "binascii": __import__("binascii"),
+        "struct": __import__("struct"),
+    }
+    _exec_nodes(keep, sandbox)
     return sandbox
 
 
@@ -138,52 +163,14 @@ def test_no_gpio_literals_outside_the_pins_block(fw):
 
 
 def test_i2c_bus_pins_are_documented_as_8_9():
-    """The pin map has to record that I2C(0) is GPIO8/9, not GPIO2/3.
-
-    The theory that GPIO2/3 were the I2C bus was wrong and cost a reflash.
-    So the firmware states the resolved pins, where they come from, and that
-    the obvious alternative collides with a servo. An earlier version of this
-    test only grepped for a macro name, so deleting the whole warning still
-    passed; it now fails when the collision warning is gone.
-    """
+    """The pin map has to record that I2C(0) is GPIO8/9, not GPIO2/3."""
     assert re.search(r"I2C\(0\)", SOURCE)
     assert re.search(r"GPIO8/9", SOURCE)
     assert "mpconfigboard.h" in SOURCE
 
-    # The warning must survive, not just the pin claim.
     warning = SOURCE[SOURCE.index("I2C(0) is"):SOURCE.index("PINS = {")]
     assert re.search(r"GPIO1/2", warning), "stock-firmware collision warning is gone"
     assert re.search(r"collide", warning), "the consequence is not stated"
-
-
-def test_client_handshake_is_accepted():
-    """The client announces its IP with H,<ip>; the car has to latch it."""
-    assert 'parts[0] == "H"' in SOURCE
-    assert 'HOST_IP' in SOURCE
-
-    # A bare assignment inside the loop would create a loop-local that never
-    # reaches sock.sendto, so it must go through globals(). The lookup sits
-    # above the if, so search the surrounding block rather than inside it.
-    branch = SOURCE.split('parts[0] == "H"')[1].split('parts[0] == "S"')[0]
-    assert 'host["HOST_IP"]' in branch
-    assert 'globals()' in SOURCE[:SOURCE.index('parts[0] == "H"')], (
-        "the handshake writes a bare name; HOST_IP would stay at its startup value"
-    )
-
-
-def test_handshake_rejects_a_malformed_address():
-    """Junk must not latch, or telemetry goes nowhere."""
-    handshake = SOURCE.split('parts[0] == "H"')[1].split('parts[0] == "S"')[0]
-    assert "len(octets) == 4" in handshake
-    assert "isdigit" in handshake
-    assert "int(o) < 256" in handshake
-
-
-def test_host_ip_is_read_at_send_time():
-    """The send has to use the current value, not a value bound at startup."""
-    send = SOURCE.split('msg = f"B,{pct},0"')[1]
-    assert "HOST_IP" in send
-    assert "(HOST_IP, PORT)" in send
 
 
 # --- servo ------------------------------------------------------------------
@@ -194,37 +181,31 @@ def test_servo_uses_50hz_hardware_pwm(fw):
 
 
 def test_servo_pulse_mapping(fw):
+    """Standard hobby servos take 1ms..2ms for 0..180 degrees."""
     servo = fw["Servo"](2)
-    for angle, expected in ((0, 500), (90, 1500), (180, 2500)):
+    for angle, expected in ((0, 1000), (90, 1500), (180, 2000)):
         servo._write(angle)
         assert servo.pwm.pulse_us == pytest.approx(expected, abs=0.5)
 
 
 def test_servo_pulse_stays_in_spec_at_every_angle(fw):
-    """A hobby servo accepts 500-2500us. Nothing may fall outside that."""
+    """Nothing may fall outside the 1000..2000us window."""
     servo = fw["Servo"](2)
     for angle in range(181):
         servo._write(angle)
-        assert 500 <= servo.pwm.pulse_us <= 2500, angle
+        assert 1000 <= servo.pwm.pulse_us <= 2000, angle
 
 
-def test_old_bug_produced_an_out_of_spec_pulse(fw):
-    """The regression: 3 pulses with no gap = one 4500us HIGH.
-
-    Documents what the fix replaced, so nobody reintroduces a repeat loop.
-    """
-    pulse_90 = 500 + (90 / 180.0) * 2000
-    assert pulse_90 == pytest.approx(1500, abs=0.5)
-    assert pulse_90 * 3 == pytest.approx(4500, abs=1)
-    assert pulse_90 * 3 > 2500  # out of spec — what the car actually received
+def test_old_bug_produced_an_out_of_spec_pulse():
+    """Documents the 500..2500us mapping this replaced."""
+    pulse_0 = 500 + (0 / 180.0) * 2000
+    pulse_180 = 500 + (180 / 180.0) * 2000
+    assert pulse_0 == 500 and pulse_180 == 2500
+    assert pulse_0 < 1000 and pulse_180 > 2000
 
 
 def test_servo_has_no_back_to_back_pulse_loop():
-    """The `for _ in range(3): write_pulse(...)` shape must not come back.
-
-    Checked against the code only — the docstring names the old bug on
-    purpose, so scanning the whole file would match its own explanation.
-    """
+    """The `for _ in range(3): write_pulse(...)` shape must not come back."""
     tree = ast.parse(SOURCE)
     servo_cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Servo")
     methods = {m.name: ast.dump(m) for m in servo_cls.body if isinstance(m, ast.FunctionDef)}
@@ -234,20 +215,15 @@ def test_servo_has_no_back_to_back_pulse_loop():
         assert "sleep_us" not in dump, f"{name} busy-waits on sleep_us"
         assert "range" not in dump, f"{name} loops pulses instead of using hardware PWM"
 
-    # The frame must be the LEDC peripheral's job.
     assert "duty_ns" in methods["_write"]
 
 
 def test_servo_has_no_signal_until_commanded(fw):
-    """Boot must not drive the steering.
-
-    __init__ used to call _write(90), so both servos got a live 1500us frame
-    the moment the firmware started and drove to the default angle with no
-    command ever sent. duty stays 0 until set_angle() arrives.
-    """
+    """Boot must not drive the steering."""
     servo = fw["Servo"](2)
     assert servo.pwm.duty_ns_value == 0, "servo is powered before any command"
     assert servo.target is None
+    assert servo.holding is False
 
 
 def test_first_command_starts_the_frame(fw):
@@ -255,19 +231,14 @@ def test_first_command_starts_the_frame(fw):
     servo = fw["Servo"](2)
     assert servo.pwm.duty_ns_value == 0
 
-    servo.set_angle(95)          # one step from the resting 90
-    servo._step()
+    servo.set_angle(95)
     assert servo.pwm.duty_ns_value > 0
     assert servo.angle == 95
-    assert servo.pwm.pulse_us == pytest.approx(1555, abs=2)  # 500 + 95/180*2000
+    assert servo.pwm.pulse_us == pytest.approx(1000 + 95 / 180 * 1000, abs=1)
 
 
 def test_servo_keeps_emitting_after_arriving(fw):
-    """The old _step() returned early at the target, so no pulses followed.
-
-    With a hardware channel the frame continues, so the servo keeps its
-    holding torque when idle. Assert the channel is not silenced.
-    """
+    """A hardware channel keeps the frame running, so idle hold torque stays."""
     servo = fw["Servo"](2)
     servo._write(90)
     duty_at_rest = servo.pwm.duty_ns_value
@@ -276,38 +247,61 @@ def test_servo_keeps_emitting_after_arriving(fw):
 
 
 def test_set_angle_is_non_blocking(fw):
-    """No sleep in the command path — a busy wait stalls the receive loop."""
+    """No sleep in the command path — a busy wait stalls the main loop."""
     servo = fw["Servo"](2)
-    assert servo.set_angle(120) is None  # returns immediately
-    assert servo.target == 120
+    assert servo.set_angle(120) is None
+    assert servo.angle == 120
+
+
+def test_servo_slew_is_slow_enough_for_the_rail(fw):
+    """5 deg/tick reset the ESP32 mid-sweep; the slew must stay gentle."""
+    servo = fw["Servo"](2)
+    assert servo.speed <= 2
 
 
 def test_servo_step_moves_gradually_and_snaps(fw):
     servo = fw["Servo"](2)
-    servo.angle = 90
-    servo.speed = 5
+    servo._write(90)
     servo.target = 100
 
     servo._step()
-    assert servo.angle == 95
-    servo._step()
+    assert servo.angle == 92
+    while servo._step() is False:
+        pass
     assert servo.angle == 100
-    assert servo._step() is False  # already there, no further work
+    assert servo._step() is False
 
 
 def test_servo_clamps_out_of_range_commands(fw):
-    """A malformed S,999 must not compute a 14ms pulse."""
+    """A malformed S,999 must not compute a pulse outside the servo window."""
     servo = fw["Servo"](2)
-    servo.angle = 90
     servo.set_angle(999)
-    assert servo.target == 180
-    servo.angle = 90
+    assert servo.angle == 180
+    servo._write(90)
     servo.set_angle(-50)
     assert servo.target == 0
+    while servo._step() is False:
+        pass
+    assert servo.angle == 0
+
+
+def test_release_drops_the_frame_and_set_angle_wakes_it(fw):
+    """X parks the servo; the next S must light it up again."""
+    servo = fw["Servo"](2)
+    servo.set_angle(90)
+    assert servo.pwm.duty_ns_value > 0
+
+    servo.release()
+    assert servo.pwm.duty_ns_value == 0
+    assert servo.target is None
+    assert servo.holding is False
+
+    servo.set_angle(90)
+    assert servo.pwm.duty_ns_value > 0, "the servo stayed asleep after a command"
+    assert servo.holding is True
 
 
 def test_each_servo_owns_its_own_ledc_channel(fw):
-    """Two PWM() objects on two pins — sharing one would break the frame."""
     left = fw["Servo"](fw["PINS"]["servo_left"])
     right = fw["Servo"](fw["PINS"]["servo_right"])
     assert left.pwm is not right.pwm
@@ -315,28 +309,29 @@ def test_each_servo_owns_its_own_ledc_channel(fw):
     assert right.pwm.pin.num == 3
 
 
-def test_both_servos_are_constructed(fw):
-    assert "Servo(PINS[\"servo_left\"])" in SOURCE
-    assert "Servo(PINS[\"servo_right\"])" in SOURCE
+def test_both_servos_are_constructed():
+    assert 'Servo(PINS["servo_left"])' in SOURCE
+    assert 'Servo(PINS["servo_right"])' in SOURCE
 
 
 def test_steering_command_reaches_both_servos():
     """One S command must move both, or the linkage fights itself."""
-    s_block = SOURCE.split('if parts[0] == "S"')[1].split("# T command")[0]
+    s_block = SOURCE.split('parts[0] == "S"')[1].split('elif parts[0] == "X"')[0]
     assert s_block.count("set_angle(angle)") == 2
     assert "servo_2.set_angle(angle)" in s_block
 
 
-def test_servo_tick_in_the_main_loop_drives_both():
-    """Otherwise servo_2 is constructed but never stepped.
+def test_release_command_reaches_both_servos():
+    x_block = SOURCE.split('elif parts[0] == "X"')[1].split('elif parts[0] == "T"')[0]
+    assert x_block.count("release()") == 2
+    assert "servo_2.release()" in x_block
 
-    rcar.py has two `while True:` loops (one inside connect_wifi), so split on
-    the last one — the actual main loop.
-    """
-    loop = SOURCE.split("while True:")[-1]
+
+def test_servo_tick_in_the_main_loop_drives_both():
+    """Otherwise servo_2 is constructed but never stepped."""
+    loop = SOURCE.split("--- SERVO STEP")[1].split("--- FAILSAFE ---")[0]
     assert "servo._step()" in loop
     assert "servo_2._step()" in loop
-    assert "servo_2._last_step_time = now" in loop
 
 
 # --- failsafe ---------------------------------------------------------------
@@ -346,24 +341,18 @@ def test_failsafe_threshold(fw):
 
 
 def test_failsafe_is_a_time_comparison():
-    """A sticky boolean latches true and disables the failsafe entirely."""
     assert "last_drive_time = time.ticks_ms()" in SOURCE
     assert "time.ticks_diff(now, last_drive_time) > FAILSAFE_MS" in SOURCE
     assert "if got_command" not in SOURCE
 
 
 def test_drive_command_refreshes_the_failsafe_timer():
-    t_block = SOURCE.split('if parts[0] == "T"')[1].split("except Exception")[0]
-    assert "last_drive_time = now" in t_block
-    assert "motor.run(throttle)" in t_block
+    fn = SOURCE.split("def handle_text")[1].split("\nprint(")[0]
+    assert "last_drive_time = time.ticks_ms()" in fn
+    assert "motor.run(throttle)" in fn
 
 
-def test_failsafe_stays_quiet_while_idle(fw):
-    """No throttle ever sent → no FAILSAFE message every second.
-
-    The condition used to fire on a bare timeout with no throttle check, so an
-    untouched car logged the failsafe once a second forever.
-    """
+def test_failsafe_stays_quiet_while_idle():
     failsafe = SOURCE.split("--- FAILSAFE ---")[1]
     assert "throttle != 0" in failsafe
     assert "throttle = 0" in failsafe, "the motor is not marked as stopped"
@@ -375,45 +364,34 @@ def test_failsafe_stops_the_motor():
 
 
 def test_failsafe_logs_when_it_fires():
-    """Without a log, "it stopped by itself" is undiagnosable next session."""
     failsafe = SOURCE.split("--- FAILSAFE ---")[1]
     assert "print(" in failsafe
     assert "FAILSAFE" in failsafe
 
 
 def test_failsafe_threshold_fires_after_exactly_1000ms(fw):
-    """1000ms is the decision, so the boundary has to be right.
-
-    rcar.py uses `ticks_diff(now, last) > FAILSAFE_MS`, a strict comparison.
-    At exactly 1000ms elapsed the motor still runs; at 1001ms it stops. That
-    one-millisecond asymmetry is the intended behaviour, so assert it rather
-    than a tautology.
-    """
+    """1000ms is the decision, so the boundary has to be right."""
     threshold = fw["FAILSAFE_MS"]
 
     def should_stop(elapsed_ms):
-        """Mirror the firmware's comparison exactly."""
         return elapsed_ms > threshold
 
     assert should_stop(0) is False
     assert should_stop(threshold - 1) is False
-    assert should_stop(threshold) is False   # exactly at: not yet
+    assert should_stop(threshold) is False
     assert should_stop(threshold + 1) is True
     assert should_stop(10_000) is True
 
-    # And the firmware must use the same strict form.
-    assert f"> FAILSAFE_MS" in SOURCE
-    assert f">= FAILSAFE_MS" not in SOURCE
+    assert "> FAILSAFE_MS" in SOURCE
+    assert ">= FAILSAFE_MS" not in SOURCE
 
 
 def test_failsafe_threshold_is_many_main_loops():
-    """The loop sleeps 20ms, so 1000ms is 50 iterations of margin."""
     assert 1000 % 20 == 0
     assert 1000 // 20 == 50
 
 
 def test_motor_still_uses_500hz(fw):
-    """The bench-verified motor frequency must not change."""
     assert ".freq(500)" in SOURCE
     motor = fw["Motor"]()
     assert motor.pwm_fwd.freq_value == 500
@@ -429,14 +407,73 @@ def test_motor_pins_come_from_the_pins_dict(fw):
 def test_motor_direction_still_works(fw):
     motor = fw["Motor"]()
     motor.run(100)
-    assert motor.pwm_fwd.duty_u16_value if False else True
+    assert motor.pwm_fwd.duty_ns_value > 0
+    assert motor.pwm_rev.duty_ns_value == 0
     motor.run(-100)
+    assert motor.pwm_fwd.duty_ns_value == 0
+    assert motor.pwm_rev.duty_ns_value > 0
     motor.run(0)
+    assert motor.pwm_fwd.duty_ns_value == 0
+    assert motor.pwm_rev.duty_ns_value == 0
 
 
-def test_port_matches_the_client():
-    """net.py targets 5005; a mismatch means commands go nowhere."""
-    assert "PORT = 5005" in SOURCE
-    client = RCAR.parent / "src" / "network.py"
-    if client.exists():
-        assert "5005" in client.read_text()
+# --- web socket -------------------------------------------------------------
+
+def test_web_server_serves_the_page_and_ws():
+    assert "PORT = 80" in SOURCE
+    assert 'PAGE_PATH = "/www/index.html"' in SOURCE
+    assert 'path == "/ws"' in SOURCE
+    assert "Sec-WebSocket-Accept" in SOURCE
+    assert (RCAR.parent / "www" / "index.html").exists()
+
+
+def test_ws_accept_matches_rfc6455_example(fw):
+    """The RFC 6455 sample key must produce the sample accept value."""
+    assert fw["ws_accept"]("dGhlIHNhbXBsZSBub25jZQ==") == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+
+
+def test_ws_parse_reads_a_masked_text_frame(fw):
+    """Browser frames are masked; the payload must come out unmasked."""
+    payload = b"S,60"
+    mask = b"\x37\xfa\x21\x3d"
+    masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+    frame = bytes([0x81, 0x80 | len(payload)]) + mask + masked
+
+    opcode, text, used = fw["ws_parse"](frame)
+    assert opcode == 0x1
+    assert text == b"S,60"
+    assert used == len(frame)
+
+
+def test_ws_parse_waits_for_a_complete_frame(fw):
+    assert fw["ws_parse"](b"\x81") is None
+    assert fw["ws_parse"](b"\x81\x84\x37\xfa") is None
+
+
+def test_ws_parse_reads_an_extended_length(fw):
+    payload = b"T" + b"0" * 200
+    mask = b"\x00\x00\x00\x00"
+    frame = bytes([0x81, 0x80 | 126]) + len(payload).to_bytes(2, "big") + mask + payload
+    opcode, text, used = fw["ws_parse"](frame)
+    assert opcode == 0x1
+    assert text == payload
+    assert used == len(frame)
+
+
+def test_ws_send_writes_a_text_frame(fw):
+    sock = FakeSocket()
+    fw["ws_send"](sock, "B,97")
+    assert sock.sent == b"\x81\x04B,97"
+
+
+def test_telemetry_goes_out_over_the_websocket():
+    assert 'ws_send(client, "B,%d" % pct)' in SOURCE
+    assert "STATS_MS = 5000" in SOURCE
+
+
+def test_page_talks_to_the_ws_endpoint():
+    page = (RCAR.parent / "www" / "index.html").read_text()
+    assert "/ws" in page
+    assert "S," in page
+    assert "T," in page
+    assert "'X'" in page

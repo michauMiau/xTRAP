@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>xTRAP control</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: #14161a; color: #e8eaed;
+    font: 16px/1.4 system-ui, sans-serif; touch-action: manipulation;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #d9534f; flex: none; }
+  .dot.on { background: #4caf50; }
+  #batt { margin-left: auto; font-variant-numeric: tabular-nums; color: #9aa0a6; }
+  label { display: block; margin: 14px 0 6px; color: #9aa0a6; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { flex: 1; height: 40px; }
+  button {
+    width: 100%; margin-top: 20px; padding: 14px; font-size: 16px;
+    color: #fff; background: #30363d; border: 1px solid #444c56; border-radius: 8px;
+  }
+  button:active { background: #3d444d; }
+  .hint { margin-top: 16px; font-size: 13px; color: #6e7681; }
+</style>
+</head>
+<body>
+<h1>xTRAP</h1>
+<div class="bar">
+  <span class="dot" id="dot"></span>
+  <span id="conn">connecting</span>
+  <span id="batt">--%</span>
+</div>
+
+<label for="steer">Steering</label>
+<div class="row">
+  <input type="range" id="steer" min="0" max="180" step="1" value="90">
+  <output id="steerVal">90</output>
+</div>
+
+<label for="throttle">Throttle</label>
+<div class="row">
+  <input type="range" id="throttle" min="-100" max="100" step="5" value="0">
+  <output id="throttleVal">0</output>
+</div>
+
+<button id="release" type="button">Release steering</button>
+
+<p class="hint">Keyboard: left/right steer, up/down throttle, space releases.</p>
+
+<script>
+const steer = document.getElementById('steer');
+const throttle = document.getElementById('throttle');
+const steerVal = document.getElementById('steerVal');
+const throttleVal = document.getElementById('throttleVal');
+const dot = document.getElementById('dot');
+const conn = document.getElementById('conn');
+const batt = document.getElementById('batt');
+
+let ws = null;
+let lastSent = 0;
+
+function send(text) {
+  if (ws && ws.readyState === 1) ws.send(text);
+}
+
+function pushSteer() {
+  steerVal.textContent = steer.value;
+  const now = Date.now();
+  if (now - lastSent < 40) return;
+  lastSent = now;
+  send('S,' + steer.value);
+}
+
+function pushThrottle() {
+  throttleVal.textContent = throttle.value;
+  const now = Date.now();
+  if (now - lastSent < 40) return;
+  lastSent = now;
+  send('T,' + throttle.value);
+}
+
+steer.addEventListener('input', pushSteer);
+throttle.addEventListener('input', pushThrottle);
+
+document.getElementById('release').addEventListener('click', () => send('X'));
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  if (e.key === 'ArrowLeft') { steer.value = Math.max(0, +steer.value - 10); pushSteer(); }
+  else if (e.key === 'ArrowRight') { steer.value = Math.min(180, +steer.value + 10); pushSteer(); }
+  else if (e.key === 'ArrowUp') { throttle.value = Math.min(100, +throttle.value + 20); pushThrottle(); }
+  else if (e.key === 'ArrowDown') { throttle.value = Math.max(-100, +throttle.value - 20); pushThrottle(); }
+  else if (e.key === ' ') { e.preventDefault(); send('X'); }
+});
+
+function connect() {
+  ws = new WebSocket('ws://' + location.host + '/ws');
+  ws.onopen = () => { dot.className = 'dot on'; conn.textContent = 'connected'; };
+  ws.onclose = () => {
+    dot.className = 'dot'; conn.textContent = 'reconnecting';
+    setTimeout(connect, 1000);
+  };
+  ws.onmessage = (ev) => {
+    if (ev.data.startsWith('B,')) batt.textContent = ev.data.slice(2) + '%';
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
