@@ -421,7 +421,8 @@ def test_motor_direction_still_works(fw):
 
 def test_web_server_serves_the_page_and_ws():
     assert "PORT = 80" in SOURCE
-    assert 'PAGE_PATH = "/www/index.html"' in SOURCE
+    assert '"/www/index.html"' in SOURCE
+    assert '"/sd/www/index.html"' in SOURCE
     assert 'path == "/ws"' in SOURCE
     assert "Sec-WebSocket-Accept" in SOURCE
     assert (RCAR.parent / "www" / "index.html").exists()
