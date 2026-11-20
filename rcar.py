@@ -76,6 +76,22 @@ def connect_wifi():
     print("Connected:", nic.ifconfig())
 
 
+def wifi_rssi():
+    """Signal strength in dBm, or None when the driver will not say."""
+    try:
+        return nic.status('rssi')
+    except Exception:
+        return None
+
+
+def rssi_bars(rssi):
+    """0..4 bars from a dBm value (-30 strong, -90 gone)."""
+    if rssi is None:
+        return "?"
+    level = (rssi + 90) * 4 // 60
+    return "#" * max(0, min(4, level))
+
+
 # --- IMU Setup ---
 i2c = I2C(0)
 imu = bmi270.BMI270(i2c)
@@ -247,7 +263,7 @@ def ws_send(sock, text):
     else:
         hdr.append(127)
         hdr += struct.pack(">Q", n)
-    sock.send(bytes(hdr) + data)
+    send_all(sock, bytes(hdr) + data)
 
 
 def ws_parse(buf):
@@ -289,38 +305,54 @@ def ws_parse(buf):
     return opcode, bytes(payload), off + ln
 
 
-def read_page():
-    """The control page, served from the card or the SD card. Falls back to a
-    minimal page if neither is present so the robot is never a brick without
-    its UI."""
+def find_page():
+    """Locate the control page on the internal flash or the SD card.
+
+    Returns (path, bytes) or (None, None) when it is in neither place, so the
+    screen can say the web UI is missing instead of failing silently.
+    """
     for path in PAGE_PATHS:
         try:
             with open(path, "rb") as f:
-                return f.read()
+                return path, f.read()
         except Exception:
             pass
+    return None, None
+
+
+PAGE_PATH, PAGE_BYTES = find_page()
+PAGE_OK = PAGE_PATH is not None
+
+
+def read_page():
+    if PAGE_BYTES is not None:
+        return PAGE_BYTES
     return b"<html><body><h1>xTRAP</h1><p>index.html not found</p></body></html>"
 
 
 def send_all(sock, data):
-    """Send a whole buffer on a non-blocking socket.
+    """Send a whole buffer on the client socket.
 
-    socket.send() on a non-blocking socket raises as soon as the buffer is
-    full, which is exactly what happens when a browser pulls the 4KB page.
-    Retry with a short sleep, and give up after a second so a dead client
-    cannot hang the main loop.
+    The client socket is non-blocking because the main loop polls it, and a
+    non-blocking send on MicroPython raises as soon as the buffer is full —
+    a 4KB page hits that on the first try, and retrying a non-blocking send
+    does not drain it. Send with the socket temporarily blocking and a
+    timeout, then hand it back to the poll loop. Anything that still fails
+    (dead peer, timeout) propagates to the caller, which drops the client.
     """
-    view = memoryview(data)
-    tries = 0
-    while view:
+    try:
+        sock.setblocking(True)
+        sock.settimeout(2.0)
+        off = 0
+        while off < len(data):
+            sent = sock.send(data[off:])
+            if sent:
+                off += sent
+    finally:
         try:
-            sent = sock.send(view)
-            view = view[sent:]
-        except OSError:
-            tries += 1
-            if tries > 200:
-                raise
-            time.sleep_ms(5)
+            sock.setblocking(False)
+        except Exception:
+            pass
 
 
 def send_page(cli):
@@ -374,6 +406,9 @@ last_drive_time = time.ticks_ms()
 throttle = 0
 dirty = True
 last_draw = 0
+# Last network error, shown on the screen: a browser that vanishes mid-send
+# must not look like a silent death.
+last_error = ""
 
 
 def gc_collect():
@@ -416,16 +451,34 @@ def handle_text(msg):
 
 
 def draw():
-    """Status screen: address, battery, steering, throttle, link."""
+    """Status screen: address, WiFi, battery, steering, throttle, link, errors."""
     DISPLAY.fill(CONFIG.palette[2])
     DISPLAY.text("xTRAP", 8, 6, CONFIG.palette[8])
-    DISPLAY.text("IP " + str(nic.ifconfig()[0]), 8, 24, CONFIG.palette[8])
-    DISPLAY.text("BAT %d%%" % pct, 8, 40, CONFIG.palette[8])
-    DISPLAY.text("STR %d" % servo.angle, 8, 56, CONFIG.palette[8])
-    DISPLAY.text("THR %d" % throttle, 8, 72, CONFIG.palette[8])
-    DISPLAY.text("WS " + ("link" if (client and client_ws) else "no link"), 8, 88, CONFIG.palette[8])
-    DISPLAY.text("ENT rel  SPC stop", 8, 108, CONFIG.palette[6])
+    DISPLAY.text("IP " + str(nic.ifconfig()[0]), 8, 22, CONFIG.palette[8])
+
+    rssi = wifi_rssi()
+    wifi = "WIFI ?"
+    if rssi is not None:
+        wifi = "WIFI %d %s" % (rssi, rssi_bars(rssi))
+    DISPLAY.text(wifi, 8, 38, CONFIG.palette[8])
+
+    DISPLAY.text("BAT %d%%" % pct, 8, 54, CONFIG.palette[8])
+    DISPLAY.text("STR %d" % servo.angle, 8, 70, CONFIG.palette[8])
+    DISPLAY.text("THR %d" % throttle, 8, 86, CONFIG.palette[8])
+    DISPLAY.text("WS " + ("link" if (client and client_ws) else "no link"), 8, 102, CONFIG.palette[8])
+
+    warn = last_error or ("" if PAGE_OK else "WEBUI MISSING")
+    hint = "ENT rel  SPC stop"
+    DISPLAY.text("ERR " + warn[:22] if warn else hint, 8, 118, warn_color())
     DISPLAY.show()
+
+
+def warn_color():
+    """Red-ish palette entry, falling back to the light text color."""
+    try:
+        return CONFIG.palette[11]
+    except Exception:
+        return CONFIG.palette[8]
 
 
 def _serve_client(ev):
@@ -440,8 +493,11 @@ def _serve_client(ev):
         return
     try:
         data = client.recv(512)
-    except Exception:
-        data = b""
+    except OSError:
+        # EAGAIN: the poll said readable but the data is not here yet. That is
+        # "try again later", not "the client is gone" — dropping here is what
+        # answered every request with an empty response.
+        return
     if not data:
         drop_client()
         return
@@ -488,6 +544,10 @@ def _serve_client(ev):
 
 
 print("Web control on http://%s/ (ws /ws)" % nic.ifconfig()[0])
+if PAGE_OK:
+    print("Web UI:", PAGE_PATH, len(PAGE_BYTES), "bytes")
+else:
+    print("WEBUI MISSING: no index.html in", PAGE_PATHS)
 
 while True:
     now = time.ticks_ms()
@@ -555,7 +615,8 @@ while True:
         except Exception as exc:
             # A browser that vanishes mid-response must not take the app down;
             # MicroHydra catches an uncaught exception by dropping to the launcher.
-            print("client error:", exc)
+            last_error = str(exc)
+            print("client error:", last_error)
             drop_client()
             dirty = True
 

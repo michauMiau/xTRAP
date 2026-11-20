@@ -69,10 +69,17 @@ class FakeSocket:
 
     def __init__(self):
         self.sent = b""
+        self.blocking = None
 
     def send(self, data):
         self.sent += data
         return len(data)
+
+    def setblocking(self, flag):
+        self.blocking = flag
+
+    def settimeout(self, seconds):
+        pass
 
 
 def _machine_stub():
@@ -107,7 +114,7 @@ def _load_from_source():
                 name = node.name
             elif isinstance(node, ast.Assign):
                 name = node.targets[0].id if isinstance(node.targets[0], ast.Name) else None
-            if name in ("Servo", "Motor", "ws_accept", "ws_send", "ws_parse") or (
+            if name in ("Servo", "Motor", "send_all", "ws_accept", "ws_send", "ws_parse") or (
                 name and re.match(r"^(PINS|FAILSAFE_MS|WS_GUID)$", name)
             ):
                 keep.append(node)
