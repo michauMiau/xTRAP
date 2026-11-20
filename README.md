@@ -26,6 +26,8 @@ Connected: ('192.168.1.225', '255.255.255.0', ...)
 Web control on http://192.168.1.225/ (ws /ws)
 ```
 
+It is a MicroHydra app: the Cardputer screen shows the car's IP, battery, steering, throttle and link state while it runs. `ENT` releases the steering servos, `SPC` stops the motor, `ESC` recenters the steering.
+
 Open that address in a browser. The page has a steering slider, a throttle slider and a release button; arrow keys work on desktop. Battery telemetry arrives over the same WebSocket every 5s.
 
 ## Hardware

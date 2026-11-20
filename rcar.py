@@ -1,13 +1,15 @@
-"""xTRAP car firmware.
+"""xTRAP car firmware — MicroHydra app.
 
-WiFi STA plus a small web server on the car: GET / serves the control page and
-GET /ws upgrades to a WebSocket that carries commands in and telemetry out.
-The remote is a browser on the phone or laptop, so there is no client app to
-install and no UDP port to keep open.
+The Cardputer screen shows the car's address, battery, steering and link
+state while it runs; the browser remote connects to ws://<car-ip>/ws and
+drives it. ENT releases the steering servos, SPC stops the motor, ESC
+recenters the steering.
 """
+from lib import display
+from lib import userinput
+from lib.battlevel import Battery
 from lib.hydra.config import Config
 from lib.userinput import bmi270
-from lib.battlevel import Battery
 from machine import I2C, Pin, PWM
 import binascii
 import hashlib
@@ -44,9 +46,13 @@ PORT = 80
 PAGE_PATH = "/www/index.html"
 STATS_MS = 5000
 
+# --- MICROHYDRA UI ---
+DISPLAY = display.Display()
+INPUT = userinput.UserInput()
+CONFIG = Config()
+
 # --- WIFI ---
 nic = network.WLAN(network.STA_IF)
-config = Config()
 nic.config(pm=0)
 
 
@@ -57,7 +63,7 @@ def connect_wifi():
     if not nic.isconnected():
         while True:
             try:
-                nic.connect(config['wifi_ssid'], config['wifi_pass'])
+                nic.connect(CONFIG['wifi_ssid'], CONFIG['wifi_pass'])
                 break
             except Exception:
                 time.sleep_ms(500)
@@ -80,11 +86,6 @@ def read_accel():
     except Exception:
         return 0.0, 0.0, 0.0
 
-
-# Keep the screen backlight off so it does not fight the servo rail.
-backlight = PWM(Pin(PINS["backlight"]))
-backlight.freq(1000)
-backlight.duty(0)
 
 # --- SERVO (smooth non-blocking via main-loop time check) ---
 
@@ -345,6 +346,8 @@ last_drive_time = time.ticks_ms()
 # Last commanded throttle. 0 = nothing to stop, so the failsafe stays quiet
 # until the car is actually moving.
 throttle = 0
+dirty = True
+last_draw = 0
 
 
 def gc_collect():
@@ -357,7 +360,7 @@ def gc_collect():
 
 def handle_text(msg):
     """One command from the browser: S,<angle> / T,<throttle> / X."""
-    global throttle, last_drive_time
+    global throttle, last_drive_time, dirty
     parts = msg.split(",")
 
     if parts[0] == "S" and len(parts) > 1:
@@ -367,11 +370,13 @@ def handle_text(msg):
             return
         servo.set_angle(angle)
         servo_2.set_angle(angle)
+        dirty = True
 
     elif parts[0] == "X":
         servo.release()
         servo_2.release()
         print("X release")
+        dirty = True
 
     elif parts[0] == "T" and len(parts) > 1:
         try:
@@ -381,12 +386,43 @@ def handle_text(msg):
         motor.run(throttle)
         last_drive_time = time.ticks_ms()
         print("T" + str(throttle))
+        dirty = True
+
+
+def draw():
+    """Status screen: address, battery, steering, throttle, link."""
+    DISPLAY.fill(CONFIG.palette[2])
+    DISPLAY.text("xTRAP", 8, 6, CONFIG.palette[8])
+    DISPLAY.text("IP " + str(nic.ifconfig()[0]), 8, 24, CONFIG.palette[8])
+    DISPLAY.text("BAT %d%%" % pct, 8, 40, CONFIG.palette[8])
+    DISPLAY.text("STR %d" % servo.angle, 8, 56, CONFIG.palette[8])
+    DISPLAY.text("THR %d" % throttle, 8, 72, CONFIG.palette[8])
+    DISPLAY.text("WS " + ("link" if (client and client_ws) else "no link"), 8, 88, CONFIG.palette[8])
+    DISPLAY.text("ENT rel  SPC stop", 8, 108, CONFIG.palette[6])
+    DISPLAY.show()
 
 
 print("Web control on http://%s/ (ws /ws)" % nic.ifconfig()[0])
 
 while True:
     now = time.ticks_ms()
+
+    # --- KEYS ---
+    for key in INPUT.get_new_keys():
+        if key == "ENT":
+            servo.release()
+            servo_2.release()
+            print("X release")
+            dirty = True
+        elif key == "SPC":
+            throttle = 0
+            motor.stop()
+            last_drive_time = now
+            dirty = True
+        elif key == "ESC":
+            servo.set_angle(90)
+            servo_2.set_angle(90)
+            dirty = True
 
     # --- SERVO STEP (throttled to ~50Hz) ---
     # Both step together — one mechanism, so they must not drift apart.
@@ -407,6 +443,7 @@ while True:
         motor.stop()
         throttle = 0
         last_drive_time = now
+        dirty = True
         print("FAILSAFE: no drive command for", FAILSAFE_MS, "ms — motor stopped")
 
     # --- HTTP / WEBSOCKET ---
@@ -423,12 +460,14 @@ while True:
             client_buf = b""
             client_ws = False
             print("Client:", addr)
+            dirty = True
             continue
 
         if sock is not client:
             continue
         if ev & (select.POLLHUP | select.POLLERR):
             drop_client()
+            dirty = True
             continue
         try:
             data = client.recv(512)
@@ -436,6 +475,7 @@ while True:
             data = b""
         if not data:
             drop_client()
+            dirty = True
             continue
         client_buf += data
 
@@ -488,5 +528,12 @@ while True:
             drop_client()
             continue
         last_stats = now
+        dirty = True
+
+    # --- SCREEN ---
+    if dirty or time.ticks_diff(now, last_draw) > 250:
+        draw()
+        last_draw = now
+        dirty = False
 
     time.sleep(0.02)
